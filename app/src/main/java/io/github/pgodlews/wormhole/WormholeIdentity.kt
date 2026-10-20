@@ -15,92 +15,23 @@ class WormholeIdentity(context: Context) {
     private var wifiLock: WifiManager.WifiLock? = null
 
     companion object {
-        val DEFAULT_SERVICE_NAME: String
-            get() = when {
-                android.os.Build.MODEL?.contains("Go", ignoreCase = true) == true -> "Wormhole Go"
-                android.os.Build.MODEL?.contains("TV", ignoreCase = true) == true -> "Wormhole TV"
-                android.os.Build.MODEL?.contains("+") == true -> "Wormhole Plus"
-                else -> "Wormhole Display"
-            }
+        const val DEFAULT_SERVICE_NAME = "Wormhole Display"
 
-        val isTv: Boolean
-            get() = isTvDevice()
-
-        fun isTvDevice(
-            model: String? = android.os.Build.MODEL,
-            device: String? = android.os.Build.DEVICE,
-            product: String? = android.os.Build.PRODUCT,
-            context: Context? = null
-        ): Boolean {
-            val m = model.orEmpty()
-            val d = device.orEmpty()
-            val p = product.orEmpty()
-            if (m.contains("TV", ignoreCase = true) ||
-                d.contains("ripley", ignoreCase = true) ||
-                p.contains("ripley", ignoreCase = true)) {
+        /** Android TV / Google TV: the system UI mode or the leanback/television feature. */
+        fun isTvDevice(context: Context? = null): Boolean {
+            if (context == null) return false
+            val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as? android.app.UiModeManager
+            if (uiModeManager?.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION) {
                 return true
             }
-            if (context != null) {
-                val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as? android.app.UiModeManager
-                if (uiModeManager?.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION) {
-                    return true
-                }
-                if (context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK) ||
-                    context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TELEVISION)) {
-                    return true
-                }
-            }
-            return false
+            val pm = context.packageManager
+            return pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK) ||
+                pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TELEVISION)
         }
 
-        fun isPortalGo(
-            model: String? = android.os.Build.MODEL,
-            device: String? = android.os.Build.DEVICE,
-            product: String? = android.os.Build.PRODUCT
-        ): Boolean {
-            val m = model.orEmpty()
-            val d = device.orEmpty()
-            val p = product.orEmpty()
-            return m.contains("Go", ignoreCase = true) ||
-                   d.contains("terry", ignoreCase = true) ||
-                   p.contains("terry", ignoreCase = true) ||
-                   d.contains("panam", ignoreCase = true) ||
-                   p.contains("panam", ignoreCase = true)
-        }
-
-        fun isPortalPlusGen2(
-            model: String? = android.os.Build.MODEL,
-            device: String? = android.os.Build.DEVICE,
-            product: String? = android.os.Build.PRODUCT,
-            displayWidth: Int = 0,
-            displayHeight: Int = 0
-        ): Boolean {
-            val m = model.orEmpty()
-            val d = device.orEmpty()
-            val p = product.orEmpty()
-            // Codename cipher is Portal+ Gen 2 (fixed tilt stand, no swivel)
-            if (d.contains("cipher", ignoreCase = true) || p.contains("cipher", ignoreCase = true)) {
-                return true
-            }
-            // Portal+ Gen 2 has a 2160x1440 panel; Gen 1 is 1920x1080
-            val maxDim = maxOf(displayWidth, displayHeight)
-            if (maxDim >= 2160 && (m.contains("+") || m.contains("Plus", ignoreCase = true))) {
-                return true
-            }
-            return false
-        }
-
-        fun supportsAutoOrientation(
-            context: Context? = null,
-            model: String? = android.os.Build.MODEL,
-            device: String? = android.os.Build.DEVICE,
-            product: String? = android.os.Build.PRODUCT,
-            displayWidth: Int = 0,
-            displayHeight: Int = 0
-        ): Boolean {
-            if (isTvDevice(model, device, product, context)) return false
-            if (isPortalGo(model, device, product)) return false
-            if (isPortalPlusGen2(model, device, product, displayWidth, displayHeight)) return false
+        /** Auto rotation needs an accelerometer and makes no sense on a TV. */
+        fun supportsAutoOrientation(context: Context? = null): Boolean {
+            if (isTvDevice(context)) return false
             if (context != null) {
                 val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? android.hardware.SensorManager
                 if (sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER) == null) {
@@ -110,19 +41,7 @@ class WormholeIdentity(context: Context) {
             return true
         }
 
-        fun hasOrientationSensor(
-            context: Context,
-            displayWidth: Int = 0,
-            displayHeight: Int = 0
-        ): Boolean {
-            val w = if (displayWidth > 0) displayWidth else context.resources.displayMetrics.widthPixels
-            val h = if (displayHeight > 0) displayHeight else context.resources.displayMetrics.heightPixels
-            return supportsAutoOrientation(
-                context = context,
-                displayWidth = w,
-                displayHeight = h
-            )
-        }
+        fun hasOrientationSensor(context: Context): Boolean = supportsAutoOrientation(context)
 
         fun sanitizeServiceName(raw: String?): String {
             val trimmed = raw?.trim().orEmpty()

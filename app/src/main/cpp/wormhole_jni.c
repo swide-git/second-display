@@ -39,7 +39,7 @@ static pthread_key_t g_tls_key;                     /* set on threads this shim 
 
 /* Audio codec negotiated by the current session (AirPlay "ct": 2 = ALAC, 8 = AAC-ELD).
  * ALAC (Music / iTunes audio-only, iOS audio-only) is decoded here because the
- * Portal has no MediaCodec ALAC decoder; Kotlin receives PCM tagged AUDIO_CT_PCM. */
+ * Android devices generally have no MediaCodec ALAC decoder; Kotlin receives PCM tagged AUDIO_CT_PCM. */
 #define AUDIO_CT_PCM 0
 #define AUDIO_CT_ALAC 2
 #define AUDIO_CT_AAC_ELD 8

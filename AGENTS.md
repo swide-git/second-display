@@ -188,8 +188,10 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
 - **Screen orientation & rotation**:
   `ScreenOrientation` exposes `LANDSCAPE`, `PORTRAIT`, and `AUTO`. `AUTO`
   (accelerometer rotation) is offered when `WormholeIdentity.supportsAutoOrientation()`
-  finds an accelerometer and the device is not a TV; the Portal-specific exclusions
-  in that function are inherited from upstream and inert on this build. Manual
+  finds an accelerometer and the device is not a TV (UI mode or leanback/television
+  feature). Do not detect devices by model-name substrings: upstream's Portal
+  heuristics ("Go", "+", "TV" in `Build.MODEL`) misfired on ordinary phones and
+  tablets and were removed. Manual
   `PORTRAIT` / `LANDSCAPE` stay available everywhere. Because macOS/iOS negotiate
   resolution at session setup and do not renegotiate geometry mid-session,
   switching orientation disconnects any active mirroring client
