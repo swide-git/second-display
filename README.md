@@ -3,6 +3,7 @@
   <h1>Second Display</h1>
   <p><strong>Turn an Android tablet or phone into a wireless display and speaker for your Mac, iPhone and iPad.</strong></p>
   <p>AirPlay-compatible screen mirroring &amp; extended display receiver for Android 11+.</p>
+  <p><a href="https://github.com/swiderekart-max/second-display/releases/latest"><strong>⬇ Download the latest release (APK)</strong></a> · <a href="https://github.com/swiderekart-max/second-display/releases">All releases</a></p>
 </div>
 
 ---
@@ -52,11 +53,13 @@ Tested on a Xiaomi Pad (Android 14, HyperOS, 2000×1200) with a MacBook as the s
 
 ### 1. Install the APK
 
-Build it yourself (see [Building from source](#building-from-source)) or take `second-display.apk` from this repository's Releases, then either open it on the device or install it over USB:
+Download `second-display.apk` from the [latest release](https://github.com/swiderekart-max/second-display/releases/latest) (or build it yourself, see [Building from source](#building-from-source)), then either open it on the device or install it over USB:
 
 ```bash
 adb install -r second-display.apk
 ```
+
+Release APKs are signed with the certificate `CN=Second Display, O=swiderekart-max`, SHA-256 `50:B3:E7:D4:AE:EF:85:2C:50:B8:CA:19:37:BE:E0:E2:F2:06:17:9B:74:DF:57:D9:40:19:49:CB:91:25:B6:EA`. Check with `apksigner verify --print-certs second-display.apk`.
 
 Google Play Protect may warn about an app from an unknown source and block the install. For a sideloaded build you trust, confirm on the device, or for an `adb` install switch off **Verify apps over USB** in Developer options for the duration of the install and switch it back on afterwards.
 
