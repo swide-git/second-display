@@ -162,7 +162,16 @@ Protocol details, contributor notes and troubleshooting: [AGENTS.md](AGENTS.md) 
 
 ### Releases (GitHub Actions)
 
-`.github/workflows/release.yml` builds pull requests, publishes a rolling `latest` pre-release on pushes to `main`, and a release on `vX.Y.Z` tags. Signed builds need the repository secrets `SECOND_DISPLAY_KEYSTORE_BASE64`, `SECOND_DISPLAY_KEYSTORE_PASSWORD`, `SECOND_DISPLAY_KEY_ALIAS` and `SECOND_DISPLAY_KEY_PASSWORD`; without them pushes to `main` and tags fail instead of publishing unsigned APKs.
+Releases are automatic. Every merge to `main` builds, signs and publishes the next version:
+
+| In the merge commit or PR title | Result |
+|---|---|
+| nothing | patch release, e.g. v0.4.3 → **v0.4.4** |
+| `#minor` | **v0.5.0** |
+| `#major` | **v1.0.0** |
+| `[skip release]` | build and tests only, nothing published |
+
+Pull requests get unit tests and a debug APK artifact. Pushing a `vX.Y.Z` tag by hand still publishes that exact version. Signing uses the repository secrets `SECOND_DISPLAY_KEYSTORE_BASE64`, `SECOND_DISPLAY_KEYSTORE_PASSWORD`, `SECOND_DISPLAY_KEY_ALIAS` and `SECOND_DISPLAY_KEY_PASSWORD`; without them a release fails instead of publishing an unsigned APK.
 
 ---
 
