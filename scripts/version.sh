@@ -1,8 +1,8 @@
 #!/bin/bash
 # Prints Android version settings for CI, derived from the newest vX.Y.Z tag reachable from HEAD:
-#   tagged commit v0.2.0     -> WORMHOLE_VERSION_NAME=0.2.0             WORMHOLE_VERSION_CODE=20000
-#   3 commits after v0.2.0   -> WORMHOLE_VERSION_NAME=0.2.0-3-gabc1234  WORMHOLE_VERSION_CODE=20003
-#   next tag v0.2.1          -> WORMHOLE_VERSION_NAME=0.2.1             WORMHOLE_VERSION_CODE=20100
+#   tagged commit v0.2.0     -> SECOND_DISPLAY_VERSION_NAME=0.2.0             SECOND_DISPLAY_VERSION_CODE=20000
+#   3 commits after v0.2.0   -> SECOND_DISPLAY_VERSION_NAME=0.2.0-3-gabc1234  SECOND_DISPLAY_VERSION_CODE=20003
+#   next tag v0.2.1          -> SECOND_DISPLAY_VERSION_NAME=0.2.1             SECOND_DISPLAY_VERSION_CODE=20100
 # Commits since the tag are capped at 99, so the next release always upgrades earlier main builds.
 # Minor and patch must be <= 99. Needs full history and tags (actions/checkout with fetch-depth: 0).
 set -euo pipefail
@@ -29,5 +29,5 @@ if (( code < 1 )); then
   code=1
 fi
 
-echo "WORMHOLE_VERSION_NAME=$name"
-echo "WORMHOLE_VERSION_CODE=$code"
+echo "SECOND_DISPLAY_VERSION_NAME=$name"
+echo "SECOND_DISPLAY_VERSION_CODE=$code"
