@@ -1,4 +1,4 @@
-# AGENTS.md — guide for AI agents working on Wormhole Display
+# AGENTS.md: guide for AI agents working on Second Display
 
 Read this before touching anything. It encodes hard-won facts about the AirPlay
 protocol, this Android port, and the target devices. Skipping it will cost you
@@ -8,8 +8,8 @@ hours.
 
 An AirPlay-compatible **mirroring and extended display receiver** for Android,
 for Android 11+ phones and tablets (minSdk 30, targetSdk 35, arm64, Wi-Fi
-only), tested on a Xiaomi Pad (Android 14, HyperOS). It is a fork of
-pgodlews/wormhole-display, which targeted Meta Portals (Android 9-10); Portals
+only), tested on a Xiaomi Pad (Android 14, HyperOS). Second Display is a fork of
+Wormhole Display (pgodlews/wormhole-display), which targeted Meta Portals (Android 9-10); Portals
 are not supported by this build. A Mac, iPhone or
 iPad sees the device in its native Screen Mirroring picker and streams video and
 lifting (RTSP, FairPlay, decryption, mDNS) is a vendored copy of UxPlay's C core
@@ -35,7 +35,7 @@ app/src/main/java/io/github/pgodlews/wormhole/
     AudioRenderer.kt                      AAC-ELD decode → AudioTrack
     NowPlaying.kt                         track metadata + extrapolated position for audio-only sessions
     WormholeIdentity.kt                   persisted deviceid, service name, Wi-Fi multicast lock
-scripts/build.sh                          build APK → dist/wormhole-display.apk
+scripts/build.sh                          build APK → dist/second-display.apk
 scripts/build-deps.sh                     rebuild the native deps (rarely needed)
 scripts/test-native.sh                    host regression tests for the vendored mirror loop and the DMAP parser
 docs/architecture.md                      design overview
@@ -60,8 +60,8 @@ so future upgrades remain diffable.
 
 ```bash
 ./scripts/build.sh
-adb install -r dist/wormhole-display.apk
-adb shell am start -n io.github.pgodlews.wormhole/.MainActivity
+adb install -r dist/second-display.apk
+adb shell am start -n io.github.swiderekartmax.seconddisplay/io.github.pgodlews.wormhole.MainActivity
 ```
 
 The device is reachable over ADB via USB or wireless debugging. Device and sender
@@ -79,7 +79,7 @@ Installing on a real device:
   version (`INSTALL_FAILED_VERSION_DOWNGRADE`). Set `WORMHOLE_VERSION_CODE` above
   the installed value.
 - A new signature (or an uninstall) drops the *Display over other apps* grant;
-  re-grant with `adb shell appops set io.github.pgodlews.wormhole SYSTEM_ALERT_WINDOW allow`.
+  re-grant with `adb shell appops set io.github.swiderekartmax.seconddisplay SYSTEM_ALERT_WINDOW allow`.
 - Vendor ROMs (Xiaomi, Samsung, Huawei, OnePlus) kill background apps; logcat
   `Killing … OneKeyClean` means the user cleared Recents, not a crash.
 
@@ -224,6 +224,17 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
   cutout and the dashboard pads `WindowInsets.displayCutout` (Android 15 edge to
   edge). Inside `MainActivity`, refer to `android.view.WindowInsets` by its full
   name: the Compose `WindowInsets` from `foundation.layout.*` has the same name.
+- **Application ID vs package**: `applicationId` is `io.github.swiderekartmax.seconddisplay`
+  (the installed app, its data, `pm`/`appops`/`adb` commands), while the Kotlin package
+  and `namespace` stay `io.github.pgodlews.wormhole` because the JNI symbols encode it.
+  Hence `am start` needs the full class name:
+  `io.github.swiderekartmax.seconddisplay/io.github.pgodlews.wormhole.MainActivity`.
+  The user-facing name *Second Display* lives in `app_name`, the dashboard title,
+  `WormholeIdentity.DEFAULT_SERVICE_NAME` and the service notification texts.
+- **Launcher icon**: adaptive icon in `mipmap-anydpi-v26/ic_launcher.xml` (vector
+  foreground scaled to 66 % to stay in the safe zone, `#09121E` background, monochrome
+  layer for themed icons). The PNG mipmaps are only legacy fallbacks; the source design
+  is `docs/images/second_display_icon.svg`.
 - **Package or class renames**: the JNI functions in `wormhole_jni.c`
   (`Java_io_github_pgodlews_wormhole_NativeBridge_*`) and the
   `FindClass("io/github/pgodlews/wormhole/NativeBridge$Listener")` string encode
@@ -257,7 +268,7 @@ rebuilt deps. Update `THIRD_PARTY_NOTICES.md` if versions change.
 - **Pull requests:** unit tests + debug APK, uploaded as a workflow artifact.
 - **Push to `main`:** signed release APK, republished as the rolling `latest` pre-release.
 - **Tag `vX.Y.Z`:** signed release APK published as a GitHub Release with
-  `wormhole-display.apk` and its `.sha256`.
+  `second-display.apk` and its `.sha256`.
 
 Versions come from `scripts/version.sh` (newest reachable `vX.Y.Z` tag): a tagged
 commit builds as `X.Y.Z` with versionCode `X*1000000 + Y*10000 + Z*100`; a `main`

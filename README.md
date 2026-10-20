@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="docs/images/wormhole_icon.png" width="160" alt="Wormhole Display icon" />
-  <h1>Wormhole Display</h1>
+  <img src="docs/images/second_display_icon.svg" width="160" alt="Second Display icon" />
+  <h1>Second Display</h1>
   <p><strong>Turn an Android tablet or phone into a wireless display and speaker for your Mac, iPhone and iPad.</strong></p>
   <p>AirPlay-compatible screen mirroring &amp; extended display receiver for Android 11+.</p>
 </div>
@@ -9,13 +9,13 @@
 
 ## What it is
 
-Wormhole Display makes an Android device show up in **Control Center → Screen Mirroring** on a Mac, iPhone or iPad. The Mac can use it as an **extended display** or a **mirror**, with sound. Nothing needs to be installed on the sender.
+Second Display makes an Android device show up in **Control Center → Screen Mirroring** on a Mac, iPhone or iPad. The Mac can use it as an **extended display** or a **mirror**, with sound. Nothing needs to be installed on the sender.
 
 It is an ordinary app: **no root, no cloud, no account**. It only talks to Apple devices on your local Wi-Fi.
 
-This is a fork of [pgodlews/wormhole-display](https://github.com/pgodlews/wormhole-display), which was built for Meta Portal devices (Android 9-10). This fork targets current Android phones and tablets instead; Portals are not supported by this build. See [What this fork changes](#what-this-fork-changes).
+Second Display is a fork of [Wormhole Display](https://github.com/pgodlews/wormhole-display) by Piotr Godlewski, which was built for Meta Portal devices (Android 9-10). This fork targets current Android phones and tablets instead; Portals are not supported by this build. See [What this fork changes](#what-this-fork-changes).
 
-Wormhole Display is an independent community project and is not affiliated with Apple; see the legal section below.
+Second Display is an independent community project and is not affiliated with Apple; see the legal section below.
 
 ---
 
@@ -52,17 +52,17 @@ Tested on a Xiaomi Pad (Android 14, HyperOS, 2000×1200) with a MacBook as the s
 
 ### 1. Install the APK
 
-Build it yourself (see [Building from source](#building-from-source)) or take `wormhole-display.apk` from this repository's Releases, then either open it on the device or install it over USB:
+Build it yourself (see [Building from source](#building-from-source)) or take `second-display.apk` from this repository's Releases, then either open it on the device or install it over USB:
 
 ```bash
-adb install -r wormhole-display.apk
+adb install -r second-display.apk
 ```
 
 Google Play Protect may warn about an app from an unknown source and block the install. For a sideloaded build you trust, confirm on the device, or for an `adb` install switch off **Verify apps over USB** in Developer options for the duration of the install and switch it back on afterwards.
 
 ### 2. First launch
 
-Open **Wormhole Display** and:
+Open **Second Display** and:
 
 1. **Allow notifications** when asked. The receiver runs as a foreground service; without the permission it still works, but its notification is hidden.
 2. Tap **Allow** next to *Auto-open on connect* and turn on **Display over other apps**. Android only lets the app bring itself to the front for an incoming stream with that permission.
@@ -72,7 +72,7 @@ Open **Wormhole Display** and:
 
 Several manufacturers stop background apps aggressively. On those devices:
 
-- In **Settings → Apps → Wormhole Display**: turn on **Autostart** and set battery use to **No restrictions**.
+- In **Settings → Apps → Second Display**: turn on **Autostart** and set battery use to **No restrictions**.
 - **Lock the app in Recents** (long press its card, tap the padlock), so "clear all" does not close it.
 
 ---
@@ -109,7 +109,7 @@ On the dashboard (when nothing is connected), under **Controls & Playback**:
 | H.265 video | Offer HEVC; the sender decides whether to use it. A Mac on Wi-Fi often stays on H.264 |
 | Telemetry Overlay | FPS, bitrate, resolution and codec in the top-left corner |
 | Run in Background / Start on Boot | Keep the receiver discoverable |
-| Bonjour Service Name | Name shown in Screen Mirroring |
+| Bonjour Service Name | Name shown in Screen Mirroring (default: *Second Display*) |
 
 During a session, **long press on the picture** for stats, speaker, resolution, HEVC and Disconnect.
 
@@ -148,10 +148,10 @@ Build, test and install:
 export WORMHOLE_VERSION_CODE=30003 WORMHOLE_VERSION_NAME=0.4.0-dev
 ./gradlew :app:testDebugUnitTest :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell am start -n io.github.pgodlews.wormhole/.MainActivity
+adb shell am start -n io.github.swiderekartmax.seconddisplay/io.github.pgodlews.wormhole.MainActivity
 ```
 
-`./scripts/build.sh` does the same build and copies the APK to `dist/wormhole-display.apk`.
+`./scripts/build.sh` does the same build and copies the APK to `dist/second-display.apk`.
 
 A debug-signed and a release-signed APK cannot replace each other; uninstall first when switching (this resets the receiver identity and the *Display over other apps* grant).
 
@@ -165,7 +165,7 @@ Protocol details, contributor notes and troubleshooting: [AGENTS.md](AGENTS.md) 
 
 ## How it works
 
-Wormhole Display is built on an Android port of [UxPlay](https://github.com/FDH2/UxPlay)'s C core (RTSP/RAOP, pairing, AES decryption and an embedded mDNS responder). UxPlay's desktop GStreamer pipelines are replaced with Android's hardware `MediaCodec` for video and low-latency `AudioTrack` for audio.
+Second Display is built on an Android port of [UxPlay](https://github.com/FDH2/UxPlay)'s C core (RTSP/RAOP, pairing, AES decryption and an embedded mDNS responder). UxPlay's desktop GStreamer pipelines are replaced with Android's hardware `MediaCodec` for video and low-latency `AudioTrack` for audio.
 
 ```mermaid
 flowchart LR
@@ -187,7 +187,9 @@ See [the architecture notes](docs/architecture.md) for details.
 
 ## What this fork changes
 
-Compared with [upstream](https://github.com/pgodlews/wormhole-display):
+Compared with [upstream Wormhole Display](https://github.com/pgodlews/wormhole-display):
+
+- **New name and identity**: *Second Display*, application ID `io.github.swiderekartmax.seconddisplay` (installs alongside the original, not over it), new icon.
 
 - **Android 11+ launch crash fixed**: the display was read from the application context, which throws on API 30+.
 - **Targets current Android** (minSdk 30, targetSdk 35): notification permission (Android 13), foreground-service type (Android 14), edge-to-edge with hidden system bars (Android 15). Portals (Android 9-10) are no longer supported.
@@ -199,7 +201,7 @@ Compared with [upstream](https://github.com/pgodlews/wormhole-display):
 ## Legal & Trademark Disclaimers
 
 ### Non-Affiliation Disclaimer
-**Wormhole Display** is an independent, community-developed open-source software project. It is not manufactured, endorsed, sponsored, affiliated with, or supported by **Apple Inc.**
+**Second Display** is an independent, community-developed open-source software project. It is not manufactured, endorsed, sponsored, affiliated with, or supported by **Apple Inc.**
 
 ### Nominative Fair Use
 **Apple**, **AirPlay**, **macOS**, **iOS**, **Mac**, **MacBook**, **Retina**, and **Bonjour** are trademarks or registered trademarks of **Apple Inc.** in the United States and other countries. All brand names and trademarks referenced in this repository are used strictly under **Nominative Fair Use** for technical identification and interoperability.
@@ -208,6 +210,6 @@ Compared with [upstream](https://github.com/pgodlews/wormhole-display):
 
 ## License
 
-Copyright © 2026 Piotr Godlewski, and contributors to this fork.
+Second Display is based on Wormhole Display, copyright © 2026 Piotr Godlewski. Changes in this fork © 2026 their contributors.
 
-Wormhole Display is licensed under the **GNU General Public License v3.0 (GPLv3)**; see [LICENSE](LICENSE). It links and builds upon UxPlay (GPLv3); bundled third-party components keep their own copyrights and licenses, listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Second Display is licensed under the **GNU General Public License v3.0 (GPLv3)**; see [LICENSE](LICENSE). It links and builds upon UxPlay (GPLv3); bundled third-party components keep their own copyrights and licenses, listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -8,5 +8,5 @@ export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 cd "$repo_dir"
 ./gradlew :app:assembleDebug
 mkdir -p "$repo_dir/dist"
-cp app/build/outputs/apk/debug/app-debug.apk "$repo_dir/dist/wormhole-display.apk"
-echo "$repo_dir/dist/wormhole-display.apk"
+cp app/build/outputs/apk/debug/app-debug.apk "$repo_dir/dist/second-display.apk"
+echo "$repo_dir/dist/second-display.apk"

@@ -1,4 +1,4 @@
-# Wormhole Display — architecture
+# Second Display: architecture
 
 Goal: an Android device appears in the macOS/iOS **Screen Mirroring** picker and
 accepts a native mirroring or extended-display session, with audio, and no
