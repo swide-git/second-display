@@ -206,12 +206,12 @@ class MainActivity : ComponentActivity() {
 
             MaterialTheme(
                 colorScheme = darkColorScheme(
-                    primary = Color(0xFF7DE2CE),
-                    background = Color(0xFF09121E),
-                    surface = Color(0xFF142131),
-                    surfaceVariant = Color(0xFF1B2B3E),
-                    onSurface = Color(0xFFF1F5F9),
-                    onSurfaceVariant = Color(0xFF94A3B8)
+                    primary = Palette.Accent,
+                    background = Palette.Background,
+                    surface = Palette.Surface,
+                    surfaceVariant = Palette.SurfaceVariant,
+                    onSurface = Palette.Text,
+                    onSurfaceVariant = Palette.TextMuted
                 )
             ) {
                 Surface(modifier = Modifier.fillMaxSize()) {
@@ -445,8 +445,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun Modifier.tvFocusable(
     shape: Shape = RoundedCornerShape(8.dp),
-    focusedBorderColor: Color = Color(0xFF7DE2CE),
-    focusedBackgroundColor: Color = Color(0xFF1E324A),
+    focusedBorderColor: Color = Palette.Accent,
+    focusedBackgroundColor: Color = Palette.BorderStrong,
     unfocusedBackgroundColor: Color = Color.Transparent,
     unfocusedBorderColor: Color = Color.Transparent,
     borderWidth: Dp = 2.dp,
@@ -482,13 +482,13 @@ private fun InfoRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = label, fontSize = fontSize, color = Color(0xFF94A3B8))
+        Text(text = label, fontSize = fontSize, color = Palette.TextMuted)
         Spacer(modifier = Modifier.width(6.dp))
         Text(
             text = value,
             fontSize = fontSize,
             fontWeight = FontWeight.Medium,
-            color = Color(0xFFE2E8F0),
+            color = Palette.TextSecondary,
             maxLines = 1,
             softWrap = false
         )
@@ -568,13 +568,13 @@ private fun DashboardScreen(
                 Text(
                     text = "On your Mac or iPhone: Control Center → Screen Mirroring → $serviceName",
                     fontSize = if (isTvOrCompact) 12.sp else if (isCompactScreen) 14.sp else 18.sp,
-                    color = Color(0xFFE2E8F0)
+                    color = Palette.TextSecondary
                 )
             }
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = Color(0xFF0E2A24),
-                border = BorderStroke(1.dp, Color(0xFF1E5246))
+                color = Palette.AccentContainerDark,
+                border = BorderStroke(1.dp, Palette.AccentContainer)
             ) {
                 Row(
                     modifier = Modifier.padding(
@@ -587,13 +587,13 @@ private fun DashboardScreen(
                     Box(
                         modifier = Modifier
                             .size(if (isTvOrCompact) 8.dp else 10.dp)
-                            .background(Color(0xFF7DE2CE), shape = CircleShape)
+                            .background(Palette.Accent, shape = CircleShape)
                     )
                     Text(
                         text = if (status.startsWith("Visible")) "Ready to Connect" else status,
                         fontSize = if (isTvOrCompact) 12.sp else 14.sp,
                         fontWeight = FontWeight.Medium,
-                        color = Color(0xFF7DE2CE)
+                        color = Palette.Accent
                     )
                 }
             }
@@ -608,14 +608,14 @@ private fun DashboardScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(if (isTvOrCompact) 12.dp else 16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, Color(0xFF1F3146))
+                border = BorderStroke(1.dp, Palette.Border)
             ) {
                 Column(modifier = Modifier.padding(cardPadding)) {
                     Text(
                         text = "Controls & Playback",
                         fontSize = if (isTvOrCompact) 13.sp else if (isCompactScreen) 16.sp else 18.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFFF1F5F9)
+                        color = Palette.Text
                     )
                     Spacer(modifier = Modifier.height(if (isTvOrCompact) 2.dp else if (isCompactScreen) 8.dp else 14.dp))
 
@@ -635,7 +635,7 @@ private fun DashboardScreen(
                                 text = "Screen Orientation",
                                 fontSize = if (isTvOrCompact) 12.sp else 15.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = Color(0xFFE2E8F0)
+                                color = Palette.TextSecondary
                             )
                             Text(
                                 text = when (orientationSetting) {
@@ -644,7 +644,7 @@ private fun DashboardScreen(
                                     ScreenOrientation.AUTO -> "Auto-detect from tilt sensor"
                                 },
                                 fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                color = Color(0xFF94A3B8)
+                                color = Palette.TextMuted
                             )
                         }
                         Spacer(modifier = Modifier.width(6.dp))
@@ -653,8 +653,8 @@ private fun DashboardScreen(
                                 val isSelected = orientationSetting == option
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = if (isSelected) Color(0xFF1E5246) else Color(0xFF0F1A26),
-                                    border = BorderStroke(1.dp, if (isSelected) Color(0xFF7DE2CE) else Color(0xFF1F3146)),
+                                    color = if (isSelected) Palette.AccentContainer else Palette.Chip,
+                                    border = BorderStroke(1.dp, if (isSelected) Palette.Accent else Palette.Border),
                                     modifier = Modifier
                                         .tvFocusable(
                                             shape = RoundedCornerShape(6.dp),
@@ -666,7 +666,7 @@ private fun DashboardScreen(
                                         text = option.label,
                                         fontSize = if (isTvOrCompact) 9.sp else 11.sp,
                                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                        color = if (isSelected) Color(0xFF7DE2CE) else Color(0xFF94A3B8),
+                                        color = if (isSelected) Palette.Accent else Palette.TextMuted,
                                         modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
                                     )
                                 }
@@ -675,7 +675,7 @@ private fun DashboardScreen(
                     }
 
                     Spacer(modifier = Modifier.height(dividerSpacing))
-                    HorizontalDivider(color = Color(0xFF1F3146), thickness = 0.5.dp)
+                    HorizontalDivider(color = Palette.Border, thickness = 0.5.dp)
                     Spacer(modifier = Modifier.height(dividerSpacing))
 
                     // Row 0b: Preferred Resolution
@@ -694,12 +694,12 @@ private fun DashboardScreen(
                                 text = "Preferred Resolution",
                                 fontSize = if (isTvOrCompact) 12.sp else 15.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = Color(0xFFE2E8F0)
+                                color = Palette.TextSecondary
                             )
                             Text(
                                 text = "Size offered to the sender; lower is lighter on Wi-Fi",
                                 fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                color = Color(0xFF94A3B8)
+                                color = Palette.TextMuted
                             )
                         }
                         Spacer(modifier = Modifier.width(6.dp))
@@ -711,7 +711,7 @@ private fun DashboardScreen(
                     }
 
                     Spacer(modifier = Modifier.height(dividerSpacing))
-                    HorizontalDivider(color = Color(0xFF1F3146), thickness = 0.5.dp)
+                    HorizontalDivider(color = Palette.Border, thickness = 0.5.dp)
                     Spacer(modifier = Modifier.height(dividerSpacing))
 
                     // Row 1: Speaker Output
@@ -734,29 +734,29 @@ private fun DashboardScreen(
                                 text = "Speaker Output",
                                 fontSize = if (isTvOrCompact) 12.sp else 15.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = Color(0xFFE2E8F0)
+                                color = Palette.TextSecondary
                             )
                             Text(
                                 text = if (audioEnabled) "Play sound through device speakers" else "Device speakers muted",
                                 fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                color = Color(0xFF94A3B8)
+                                color = Palette.TextMuted
                             )
                         }
                         Switch(
                             checked = audioEnabled,
                             onCheckedChange = null,
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color(0xFF09121E),
-                                checkedTrackColor = Color(0xFF7DE2CE),
-                                uncheckedThumbColor = Color(0xFF94A3B8),
-                                uncheckedTrackColor = Color(0xFF1B2B3E)
+                                checkedThumbColor = Palette.Background,
+                                checkedTrackColor = Palette.Accent,
+                                uncheckedThumbColor = Palette.TextMuted,
+                                uncheckedTrackColor = Palette.SurfaceVariant
                             ),
                             modifier = if (isTvOrCompact) Modifier.scale(0.8f) else Modifier
                         )
                     }
 
                     Spacer(modifier = Modifier.height(dividerSpacing))
-                    HorizontalDivider(color = Color(0xFF1F3146), thickness = 0.5.dp)
+                    HorizontalDivider(color = Palette.Border, thickness = 0.5.dp)
                     Spacer(modifier = Modifier.height(dividerSpacing))
 
                     // Row 2: H.265 / HEVC Video (Experimental)
@@ -779,29 +779,29 @@ private fun DashboardScreen(
                                 text = "H.265 video (Experimental)",
                                 fontSize = if (isTvOrCompact) 12.sp else 15.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = Color(0xFFE2E8F0)
+                                color = Palette.TextSecondary
                             )
                             Text(
                                 text = "Allow compatible senders to use H.265. Reconnect after changing. H.264 remains available.",
                                 fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                color = Color(0xFF94A3B8)
+                                color = Palette.TextMuted
                             )
                         }
                         Switch(
                             checked = hevcEnabled,
                             onCheckedChange = null,
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color(0xFF09121E),
-                                checkedTrackColor = Color(0xFF7DE2CE),
-                                uncheckedThumbColor = Color(0xFF94A3B8),
-                                uncheckedTrackColor = Color(0xFF1B2B3E)
+                                checkedThumbColor = Palette.Background,
+                                checkedTrackColor = Palette.Accent,
+                                uncheckedThumbColor = Palette.TextMuted,
+                                uncheckedTrackColor = Palette.SurfaceVariant
                             ),
                             modifier = if (isTvOrCompact) Modifier.scale(0.8f) else Modifier
                         )
                     }
 
                     Spacer(modifier = Modifier.height(dividerSpacing))
-                    HorizontalDivider(color = Color(0xFF1F3146), thickness = 0.5.dp)
+                    HorizontalDivider(color = Palette.Border, thickness = 0.5.dp)
                     Spacer(modifier = Modifier.height(dividerSpacing))
 
                     // Row 2b: Telemetry Overlay (Debug)
@@ -824,29 +824,29 @@ private fun DashboardScreen(
                                 text = "Telemetry Overlay (Debug)",
                                 fontSize = if (isTvOrCompact) 12.sp else 15.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = Color(0xFFE2E8F0)
+                                color = Palette.TextSecondary
                             )
                             Text(
                                 text = "Display real-time stream stats (FPS, bitrate, resolution, codec) in top-left corner",
                                 fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                color = Color(0xFF94A3B8)
+                                color = Palette.TextMuted
                             )
                         }
                         Switch(
                             checked = debugOverlayEnabled,
                             onCheckedChange = null,
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color(0xFF09121E),
-                                checkedTrackColor = Color(0xFF7DE2CE),
-                                uncheckedThumbColor = Color(0xFF94A3B8),
-                                uncheckedTrackColor = Color(0xFF1B2B3E)
+                                checkedThumbColor = Palette.Background,
+                                checkedTrackColor = Palette.Accent,
+                                uncheckedThumbColor = Palette.TextMuted,
+                                uncheckedTrackColor = Palette.SurfaceVariant
                             ),
                             modifier = if (isTvOrCompact) Modifier.scale(0.8f) else Modifier
                         )
                     }
 
                     Spacer(modifier = Modifier.height(dividerSpacing))
-                    HorizontalDivider(color = Color(0xFF1F3146), thickness = 0.5.dp)
+                    HorizontalDivider(color = Palette.Border, thickness = 0.5.dp)
                     Spacer(modifier = Modifier.height(dividerSpacing))
 
                     // Row 3: Run in Background
@@ -869,29 +869,29 @@ private fun DashboardScreen(
                                 text = "Run in Background",
                                 fontSize = if (isTvOrCompact) 12.sp else 15.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = Color(0xFFE2E8F0)
+                                color = Palette.TextSecondary
                             )
                             Text(
                                 text = "Keep receiver discoverable when app is closed or minimized",
                                 fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                color = Color(0xFF94A3B8)
+                                color = Palette.TextMuted
                             )
                         }
                         Switch(
                             checked = runInBackground,
                             onCheckedChange = null,
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color(0xFF09121E),
-                                checkedTrackColor = Color(0xFF7DE2CE),
-                                uncheckedThumbColor = Color(0xFF94A3B8),
-                                uncheckedTrackColor = Color(0xFF1B2B3E)
+                                checkedThumbColor = Palette.Background,
+                                checkedTrackColor = Palette.Accent,
+                                uncheckedThumbColor = Palette.TextMuted,
+                                uncheckedTrackColor = Palette.SurfaceVariant
                             ),
                             modifier = if (isTvOrCompact) Modifier.scale(0.8f) else Modifier
                         )
                     }
 
                     Spacer(modifier = Modifier.height(dividerSpacing))
-                    HorizontalDivider(color = Color(0xFF1F3146), thickness = 0.5.dp)
+                    HorizontalDivider(color = Palette.Border, thickness = 0.5.dp)
                     Spacer(modifier = Modifier.height(dividerSpacing))
 
                     // Row 3b: Auto-open on connect
@@ -914,7 +914,7 @@ private fun DashboardScreen(
                                 text = "Auto-open on connect",
                                 fontSize = if (isTvOrCompact) 12.sp else 15.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = if (canAutoOpen) Color(0xFFE2E8F0) else Color(0xFFF59E0B)
+                                color = if (canAutoOpen) Palette.TextSecondary else Palette.Warning
                             )
                             Text(
                                 text = if (canAutoOpen)
@@ -922,14 +922,14 @@ private fun DashboardScreen(
                                 else
                                     "Allow \"Display over other apps\" so the receiver can show the stream automatically",
                                 fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                color = Color(0xFF94A3B8)
+                                color = Palette.TextMuted
                             )
                         }
                         if (!canAutoOpen) {
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(1.dp, Color(0xFFF59E0B)),
-                                color = Color(0xFF261D0C),
+                                border = BorderStroke(1.dp, Palette.Warning),
+                                color = Palette.WarningContainer,
                                 modifier = Modifier
                                     .clickable { onRequestAutoOpen() }
                                     .padding(start = 8.dp)
@@ -938,7 +938,7 @@ private fun DashboardScreen(
                                     text = "Allow",
                                     fontSize = if (isTvOrCompact) 10.sp else 12.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = Color(0xFFF59E0B),
+                                    color = Palette.Warning,
                                     modifier = Modifier.padding(
                                         horizontal = if (isTvOrCompact) 8.dp else 12.dp,
                                         vertical = if (isTvOrCompact) 3.dp else 6.dp
@@ -948,15 +948,15 @@ private fun DashboardScreen(
                         } else {
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
-                                color = Color(0xFF0E2A24),
-                                border = BorderStroke(1.dp, Color(0xFF1E5246)),
+                                color = Palette.AccentContainerDark,
+                                border = BorderStroke(1.dp, Palette.AccentContainer),
                                 modifier = Modifier.padding(start = 8.dp)
                             ) {
                                 Text(
                                     text = "Enabled",
                                     fontSize = if (isTvOrCompact) 10.sp else 12.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = Color(0xFF7DE2CE),
+                                    color = Palette.Accent,
                                     modifier = Modifier.padding(
                                         horizontal = if (isTvOrCompact) 8.dp else 12.dp,
                                         vertical = if (isTvOrCompact) 3.dp else 6.dp
@@ -967,7 +967,7 @@ private fun DashboardScreen(
                     }
 
                     Spacer(modifier = Modifier.height(dividerSpacing))
-                    HorizontalDivider(color = Color(0xFF1F3146), thickness = 0.5.dp)
+                    HorizontalDivider(color = Palette.Border, thickness = 0.5.dp)
                     Spacer(modifier = Modifier.height(dividerSpacing))
 
                     // Row 4: Start on Boot
@@ -990,29 +990,29 @@ private fun DashboardScreen(
                                 text = "Start on Boot",
                                 fontSize = if (isTvOrCompact) 12.sp else 15.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = Color(0xFFE2E8F0)
+                                color = Palette.TextSecondary
                             )
                             Text(
                                 text = if (isTvOrCompact) "Start receiver when device powers on" else "Automatically start receiver when device powers on",
                                 fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                color = Color(0xFF94A3B8)
+                                color = Palette.TextMuted
                             )
                         }
                         Switch(
                             checked = startOnBoot,
                             onCheckedChange = null,
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color(0xFF09121E),
-                                checkedTrackColor = Color(0xFF7DE2CE),
-                                uncheckedThumbColor = Color(0xFF94A3B8),
-                                uncheckedTrackColor = Color(0xFF1B2B3E)
+                                checkedThumbColor = Palette.Background,
+                                checkedTrackColor = Palette.Accent,
+                                uncheckedThumbColor = Palette.TextMuted,
+                                uncheckedTrackColor = Palette.SurfaceVariant
                             ),
                             modifier = if (isTvOrCompact) Modifier.scale(0.8f) else Modifier
                         )
                     }
 
                     Spacer(modifier = Modifier.height(dividerSpacing))
-                    HorizontalDivider(color = Color(0xFF1F3146), thickness = 0.5.dp)
+                    HorizontalDivider(color = Palette.Border, thickness = 0.5.dp)
                     Spacer(modifier = Modifier.height(dividerSpacing))
 
                     // Row 5: Bonjour Service Name
@@ -1035,24 +1035,24 @@ private fun DashboardScreen(
                                 text = "Bonjour Service Name",
                                 fontSize = if (isTvOrCompact) 12.sp else 15.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = Color(0xFFE2E8F0)
+                                color = Palette.TextSecondary
                             )
                             Text(
                                 text = "Advertised in Screen Mirroring as: \"$serviceName\"",
                                 fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                color = Color(0xFF94A3B8)
+                                color = Palette.TextMuted
                             )
                         }
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, Color(0xFF7DE2CE)),
-                            color = Color(0xFF0E2A24)
+                            border = BorderStroke(1.dp, Palette.Accent),
+                            color = Palette.AccentContainerDark
                         ) {
                             Text(
                                 text = "Rename",
                                 fontSize = if (isTvOrCompact) 10.sp else 12.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = Color(0xFF7DE2CE),
+                                color = Palette.Accent,
                                 modifier = Modifier.padding(
                                     horizontal = if (isTvOrCompact) 8.dp else 12.dp,
                                     vertical = if (isTvOrCompact) 3.dp else 6.dp
@@ -1062,7 +1062,7 @@ private fun DashboardScreen(
                     }
 
                     Spacer(modifier = Modifier.height(dividerSpacing))
-                    HorizontalDivider(color = Color(0xFF1F3146), thickness = 0.5.dp)
+                    HorizontalDivider(color = Palette.Border, thickness = 0.5.dp)
                     Spacer(modifier = Modifier.height(dividerSpacing))
 
                     // Row 6: Receiver Service
@@ -1085,24 +1085,24 @@ private fun DashboardScreen(
                                 text = "Receiver Service",
                                 fontSize = if (isTvOrCompact) 12.sp else 15.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = Color(0xFFE2E8F0)
+                                color = Palette.TextSecondary
                             )
                             Text(
                                 text = "Restart if receiver does not appear on your device",
                                 fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                color = Color(0xFF94A3B8)
+                                color = Palette.TextMuted
                             )
                         }
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, Color(0xFF1E5246)),
-                            color = Color(0xFF0F1A26)
+                            border = BorderStroke(1.dp, Palette.AccentContainer),
+                            color = Palette.Chip
                         ) {
                             Text(
                                 text = "Restart",
                                 fontSize = if (isTvOrCompact) 10.sp else 12.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = Color(0xFF94A3B8),
+                                color = Palette.TextMuted,
                                 modifier = Modifier.padding(
                                     horizontal = if (isTvOrCompact) 8.dp else 12.dp,
                                     vertical = if (isTvOrCompact) 3.dp else 6.dp
@@ -1120,7 +1120,7 @@ private fun DashboardScreen(
                     .fillMaxWidth()
                     .tvFocusable(
                         shape = RoundedCornerShape(if (isTvOrCompact) 12.dp else 16.dp),
-                        unfocusedBorderColor = Color(0xFF1F3146),
+                        unfocusedBorderColor = Palette.Border,
                         borderWidth = 1.dp
                     ),
                 shape = RoundedCornerShape(if (isTvOrCompact) 12.dp else 16.dp),
@@ -1131,7 +1131,7 @@ private fun DashboardScreen(
                         text = "Network & Diagnostics",
                         fontSize = if (isTvOrCompact) 12.sp else if (isCompactScreen) 16.sp else 18.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFFF1F5F9)
+                        color = Palette.Text
                     )
                     Spacer(modifier = Modifier.height(if (isTvOrCompact) 2.dp else if (isCompactScreen) 8.dp else 14.dp))
                     if (isTvOrCompact) {
@@ -1167,7 +1167,7 @@ private fun DashboardScreen(
                     .fillMaxWidth()
                     .tvFocusable(
                         shape = RoundedCornerShape(if (isTvOrCompact) 12.dp else 16.dp),
-                        unfocusedBorderColor = Color(0xFF1F3146),
+                        unfocusedBorderColor = Palette.Border,
                         borderWidth = 1.dp
                     ),
                 shape = RoundedCornerShape(if (isTvOrCompact) 12.dp else 16.dp),
@@ -1178,7 +1178,7 @@ private fun DashboardScreen(
                         text = "Preferred Resolutions (${displayInfo.aspectRatioLabel})",
                         fontSize = if (isTvOrCompact) 12.sp else if (isCompactScreen) 16.sp else 18.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFFF1F5F9)
+                        color = Palette.Text
                     )
                     Spacer(modifier = Modifier.height(if (isTvOrCompact) 2.dp else if (isCompactScreen) 6.dp else 12.dp))
                     Text(
@@ -1186,7 +1186,7 @@ private fun DashboardScreen(
                         fontSize = if (isTvOrCompact) 10.sp else 12.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Medium,
-                        color = Color(0xFF7DE2CE)
+                        color = Palette.Accent
                     )
                     Spacer(modifier = Modifier.height(if (isTvOrCompact) 1.dp else if (isCompactScreen) 4.dp else 8.dp))
                     Text(
@@ -1195,7 +1195,7 @@ private fun DashboardScreen(
                         else
                             "In macOS System Settings → Displays, select $serviceName and toggle \"Show all resolutions\" to pick from these ${displayInfo.aspectRatioLabel} modes (both Extended & Mirroring supported).",
                         fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                        color = Color(0xFF94A3B8),
+                        color = Palette.TextMuted,
                         lineHeight = if (isTvOrCompact) 12.sp else 16.sp
                     )
                 }
@@ -1207,7 +1207,7 @@ private fun DashboardScreen(
                 modifier = modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(if (isTvOrCompact) 12.dp else 16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, Color(0xFF1F3146))
+                border = BorderStroke(1.dp, Palette.Border)
             ) {
                 val contentModifier = if (isFillMaxHeight) {
                     Modifier
@@ -1229,12 +1229,12 @@ private fun DashboardScreen(
                             text = "Recent Connections",
                             fontSize = if (isTvOrCompact) 14.sp else 18.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFFF1F5F9)
+                            color = Palette.Text
                         )
                         Text(
                             text = "Last ${ConnectionHistory.MAX_ENTRIES} sessions",
                             fontSize = if (isTvOrCompact) 11.sp else 13.sp,
-                            color = Color(0xFF94A3B8)
+                            color = Palette.TextMuted
                         )
                     }
 
@@ -1251,13 +1251,13 @@ private fun DashboardScreen(
                                     text = "No recent connections",
                                     fontSize = if (isTvOrCompact) 13.sp else 16.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = Color(0xFF94A3B8)
+                                    color = Palette.TextMuted
                                 )
                                 Spacer(modifier = Modifier.height(if (isTvOrCompact) 3.dp else 6.dp))
                                 Text(
                                     text = "Mirrored sessions from iPhone, iPad, or Mac will appear here.",
                                     fontSize = if (isTvOrCompact) 11.sp else 13.sp,
-                                    color = Color(0xFF64748B)
+                                    color = Palette.TextFaint
                                 )
                             }
                         }
@@ -1272,7 +1272,7 @@ private fun DashboardScreen(
                                         .fillMaxWidth()
                                         .tvFocusable(
                                             shape = RoundedCornerShape(if (isTvOrCompact) 8.dp else 10.dp),
-                                            unfocusedBackgroundColor = Color(0xFF1B2B3E)
+                                            unfocusedBackgroundColor = Palette.SurfaceVariant
                                         )
                                         .padding(
                                             horizontal = if (isTvOrCompact) 10.dp else 16.dp,
@@ -1286,7 +1286,7 @@ private fun DashboardScreen(
                                             text = entry.clientName,
                                             fontSize = if (isTvOrCompact) 12.sp else 15.sp,
                                             fontWeight = FontWeight.SemiBold,
-                                            color = Color(0xFFF1F5F9)
+                                            color = Palette.Text
                                         )
                                         Spacer(modifier = Modifier.height(2.dp))
                                         val details = buildList {
@@ -1297,18 +1297,18 @@ private fun DashboardScreen(
                                         Text(
                                             text = details,
                                             fontSize = if (isTvOrCompact) 10.sp else 13.sp,
-                                            color = Color(0xFF94A3B8)
+                                            color = Palette.TextMuted
                                         )
                                     }
                                     Surface(
                                         shape = RoundedCornerShape(8.dp),
-                                        color = Color(0xFF142131)
+                                        color = Palette.Surface
                                     ) {
                                         Text(
                                             text = ConnectionHistory.formatDuration(entry.durationSeconds),
                                             fontSize = if (isTvOrCompact) 10.sp else 13.sp,
                                             fontWeight = FontWeight.Medium,
-                                            color = Color(0xFF7DE2CE),
+                                            color = Palette.Accent,
                                             modifier = Modifier.padding(
                                                 horizontal = if (isTvOrCompact) 8.dp else 10.dp,
                                                 vertical = if (isTvOrCompact) 3.dp else 5.dp
@@ -1363,13 +1363,13 @@ private fun DashboardScreen(
         var tempName by remember { mutableStateOf(serviceName) }
         AlertDialog(
             onDismissRequest = { showNameDialog = false },
-            containerColor = Color(0xFF142131),
+            containerColor = Palette.Surface,
             title = {
                 Text(
                     text = "Change Bonjour Name",
                     fontSize = if (isTvOrCompact) 16.sp else 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFFF1F5F9)
+                    color = Palette.Text
                 )
             },
             text = {
@@ -1377,7 +1377,7 @@ private fun DashboardScreen(
                     Text(
                         text = "Customize the name shown in Screen Mirroring on macOS and iOS. Useful if you have multiple displays on the same Wi-Fi network.",
                         fontSize = if (isTvOrCompact) 12.sp else 14.sp,
-                        color = Color(0xFF94A3B8),
+                        color = Palette.TextMuted,
                         lineHeight = if (isTvOrCompact) 16.sp else 20.sp
                     )
                     Spacer(modifier = Modifier.height(if (isTvOrCompact) 10.dp else 16.dp))
@@ -1387,12 +1387,12 @@ private fun DashboardScreen(
                         label = { Text("Display Name") },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color(0xFFF1F5F9),
-                            unfocusedTextColor = Color(0xFFE2E8F0),
-                            focusedBorderColor = Color(0xFF7DE2CE),
-                            unfocusedBorderColor = Color(0xFF1F3146),
-                            focusedLabelColor = Color(0xFF7DE2CE),
-                            unfocusedLabelColor = Color(0xFF94A3B8)
+                            focusedTextColor = Palette.Text,
+                            unfocusedTextColor = Palette.TextSecondary,
+                            focusedBorderColor = Palette.Accent,
+                            unfocusedBorderColor = Palette.Border,
+                            focusedLabelColor = Palette.Accent,
+                            unfocusedLabelColor = Palette.TextMuted
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -1412,8 +1412,8 @@ private fun DashboardScreen(
                     interactionSource = saveInteraction,
                     enabled = tempName.trim().isNotBlank(),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isSaveFocused) Color(0xFF9EFFEB) else Color(0xFF7DE2CE),
-                        contentColor = Color(0xFF09121E)
+                        containerColor = if (isSaveFocused) Palette.AccentFocused else Palette.Accent,
+                        contentColor = Palette.Background
                     ),
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.border(
@@ -1438,16 +1438,16 @@ private fun DashboardScreen(
                             interactionSource = resetInteraction,
                             modifier = Modifier
                                 .background(
-                                    if (isResetFocused) Color(0xFF1E3A5F) else Color.Transparent,
+                                    if (isResetFocused) Palette.BorderStrong else Color.Transparent,
                                     RoundedCornerShape(8.dp)
                                 )
                                 .border(
                                     if (isResetFocused) 1.5.dp else 0.dp,
-                                    Color(0xFF7DE2CE),
+                                    Palette.Accent,
                                     RoundedCornerShape(8.dp)
                                 )
                         ) {
-                            Text("Reset", color = if (isResetFocused) Color.White else Color(0xFF94A3B8))
+                            Text("Reset", color = if (isResetFocused) Color.White else Palette.TextMuted)
                         }
                     }
                     val cancelInteraction = remember { MutableInteractionSource() }
@@ -1457,16 +1457,16 @@ private fun DashboardScreen(
                         interactionSource = cancelInteraction,
                         modifier = Modifier
                             .background(
-                                if (isCancelFocused) Color(0xFF1E3A5F) else Color.Transparent,
+                                if (isCancelFocused) Palette.BorderStrong else Color.Transparent,
                                 RoundedCornerShape(8.dp)
                             )
                             .border(
                                 if (isCancelFocused) 1.5.dp else 0.dp,
-                                Color(0xFF7DE2CE),
+                                Palette.Accent,
                                 RoundedCornerShape(8.dp)
                             )
                     ) {
-                        Text("Cancel", color = if (isCancelFocused) Color.White else Color(0xFF94A3B8))
+                        Text("Cancel", color = if (isCancelFocused) Color.White else Palette.TextMuted)
                     }
                 }
             }
@@ -1502,7 +1502,7 @@ private fun NowPlayingScreen(
         Box(
             modifier = modifier
                 .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xFF1B2B3E)),
+                .background(Palette.SurfaceVariant),
             contentAlignment = Alignment.Center
         ) {
             if (image != null) {
@@ -1513,7 +1513,7 @@ private fun NowPlayingScreen(
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
-                Text(text = "♪", fontSize = 96.sp, color = Color(0xFF7DE2CE))
+                Text(text = "♪", fontSize = 96.sp, color = Palette.Accent)
             }
         }
     }
@@ -1528,7 +1528,7 @@ private fun NowPlayingScreen(
                 text = nowPlaying.title.ifBlank { "AirPlay audio" },
                 fontSize = if (isCompact) 26.sp else 34.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFFF1F5F9),
+                color = Palette.Text,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = textAlign,
@@ -1540,7 +1540,7 @@ private fun NowPlayingScreen(
                     text = nowPlaying.artist,
                     fontSize = if (isCompact) 18.sp else 22.sp,
                     fontWeight = FontWeight.Medium,
-                    color = Color(0xFF7DE2CE),
+                    color = Palette.Accent,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     textAlign = textAlign
@@ -1555,7 +1555,7 @@ private fun NowPlayingScreen(
                 Text(
                     text = albumLine,
                     fontSize = if (isCompact) 14.sp else 17.sp,
-                    color = Color(0xFF94A3B8),
+                    color = Palette.TextMuted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     textAlign = textAlign
@@ -1567,8 +1567,8 @@ private fun NowPlayingScreen(
                 LinearProgressIndicator(
                     progress = { (position / nowPlaying.durationSec).toFloat() },
                     modifier = Modifier.fillMaxWidth().height(6.dp),
-                    color = Color(0xFF7DE2CE),
-                    trackColor = Color(0xFF1F3146)
+                    color = Palette.Accent,
+                    trackColor = Palette.Border
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -1576,13 +1576,13 @@ private fun NowPlayingScreen(
                         text = NowPlaying.formatTime(position),
                         fontSize = 13.sp,
                         fontFamily = FontFamily.Monospace,
-                        color = Color(0xFF94A3B8)
+                        color = Palette.TextMuted
                     )
                     Text(
                         text = "-" + NowPlaying.formatTime(nowPlaying.durationSec - position),
                         fontSize = 13.sp,
                         fontFamily = FontFamily.Monospace,
-                        color = Color(0xFF94A3B8)
+                        color = Palette.TextMuted
                     )
                 }
             }
@@ -1590,7 +1590,7 @@ private fun NowPlayingScreen(
             Text(
                 text = "Playing from ${clientName ?: "AirPlay"}",
                 fontSize = if (isCompact) 12.sp else 14.sp,
-                color = Color(0xFF64748B),
+                color = Palette.TextFaint,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = textAlign
@@ -1601,7 +1601,7 @@ private fun NowPlayingScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color(0xFF142131), Color(0xFF09121E))))
+            .background(Brush.verticalGradient(listOf(Palette.Surface, Palette.Background)))
     ) {
         if (isPortraitLayout) {
             Column(
@@ -1651,8 +1651,8 @@ private fun TelemetryOverlay(
     Surface(
         modifier = modifier.wrapContentSize(),
         shape = RoundedCornerShape(8.dp),
-        color = Color(0xDD09121E),
-        border = BorderStroke(1.dp, Color(0x667DE2CE))
+        color = Palette.BackgroundScrim,
+        border = BorderStroke(1.dp, Palette.AccentTranslucent)
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -1666,7 +1666,7 @@ private fun TelemetryOverlay(
                 Box(
                     modifier = Modifier
                         .size(6.dp)
-                        .background(Color(0xFF7DE2CE), shape = CircleShape)
+                        .background(Palette.Accent, shape = CircleShape)
                 )
                 Text(
                     text = "VIDEO",
@@ -1674,7 +1674,7 @@ private fun TelemetryOverlay(
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.5.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = Color(0xFF7DE2CE)
+                    color = Palette.Accent
                 )
                 val codecShort = if (snapshot.codecName.isNotBlank()) {
                     " (" + snapshot.codecName.removePrefix("OMX.qcom.video.decoder.").removePrefix("OMX.google.") + ")"
@@ -1691,7 +1691,7 @@ private fun TelemetryOverlay(
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                     fontFamily = FontFamily.Monospace,
-                    color = Color(0xFFF1F5F9)
+                    color = Palette.Text
                 )
             }
 
@@ -1704,7 +1704,7 @@ private fun TelemetryOverlay(
                 Box(
                     modifier = Modifier
                         .size(6.dp)
-                        .background(if (audioActive) Color(0xFF7DE2CE) else Color(0xFF64748B), shape = CircleShape)
+                        .background(if (audioActive) Palette.Accent else Palette.TextFaint, shape = CircleShape)
                 )
                 Text(
                     text = "AUDIO",
@@ -1712,7 +1712,7 @@ private fun TelemetryOverlay(
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.5.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = if (audioActive) Color(0xFF7DE2CE) else Color(0xFF94A3B8)
+                    color = if (audioActive) Palette.Accent else Palette.TextMuted
                 )
                 val audioText = if (snapshot.audioEnabled) {
                     "${snapshot.audioCodec} • Vol ${snapshot.formattedAudioVolume} • ${snapshot.formattedAudioStatus}"
@@ -1724,7 +1724,7 @@ private fun TelemetryOverlay(
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                     fontFamily = FontFamily.Monospace,
-                    color = Color(0xFFE2E8F0)
+                    color = Palette.TextSecondary
                 )
             }
 
@@ -1740,13 +1740,13 @@ private fun TelemetryOverlay(
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.5.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = Color(0xFF64748B)
+                    color = Palette.TextFaint
                 )
                 Text(
                     text = "${snapshot.totalFramesRendered} video frames • ${snapshot.audioFramesPlayed} audio frames",
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = Color(0xFF94A3B8)
+                    color = Palette.TextMuted
                 )
             }
         }
@@ -1773,14 +1773,14 @@ private fun OrientationNoticeDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF142131),
+        containerColor = Palette.Surface,
         shape = RoundedCornerShape(16.dp),
         title = {
             Text(
                 text = if (notice.resolutionChange) "Resolution Changed" else "Display Rotated",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFFF1F5F9)
+                color = Palette.Text
             )
         },
         text = {
@@ -1789,13 +1789,13 @@ private fun OrientationNoticeDialog(
                     text = if (notice.resolutionChange) "Advertised resolution changed to ${notice.width} × ${notice.height}."
                            else "Display orientation changed to $mode (${notice.width} × ${notice.height}).",
                     fontSize = 14.sp,
-                    color = Color(0xFFF1F5F9),
+                    color = Palette.Text,
                     fontWeight = FontWeight.Medium
                 )
                 Text(
                     text = "AirPlay streaming was disconnected because Apple devices do not adapt to geometry changes mid-stream. Reconnect from Screen Mirroring on your Mac or iPhone to resume.",
                     fontSize = 13.sp,
-                    color = Color(0xFF94A3B8),
+                    color = Palette.TextMuted,
                     lineHeight = 18.sp
                 )
             }
@@ -1807,8 +1807,8 @@ private fun OrientationNoticeDialog(
                 onClick = onDismiss,
                 interactionSource = okInteraction,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isOkFocused) Color(0xFF9EFFEB) else Color(0xFF7DE2CE),
-                    contentColor = Color(0xFF09121E)
+                    containerColor = if (isOkFocused) Palette.AccentFocused else Palette.Accent,
+                    contentColor = Palette.Background
                 ),
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.border(
@@ -1833,8 +1833,8 @@ private fun ResolutionPicker(selected: ResolutionPreset, onSelected: (Resolution
     Box {
         Surface(
             shape = RoundedCornerShape(6.dp),
-            color = Color(0xFF1E5246),
-            border = BorderStroke(1.dp, Color(0xFF7DE2CE)),
+            color = Palette.AccentContainer,
+            border = BorderStroke(1.dp, Palette.Accent),
             modifier = Modifier
                 .tvFocusable(shape = RoundedCornerShape(6.dp), onClick = { expanded = true })
                 .clickable { expanded = true }
@@ -1843,14 +1843,14 @@ private fun ResolutionPicker(selected: ResolutionPreset, onSelected: (Resolution
                 text = "${WormholeServer.resolutionLabel(effective)}  ▾",
                 fontSize = fontSize,
                 fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF7DE2CE),
+                color = Palette.Accent,
                 modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
             )
         }
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            containerColor = Color(0xFF142131)
+            containerColor = Palette.Surface
         ) {
             available.forEach { preset ->
                 val isSelected = preset == effective
@@ -1860,7 +1860,7 @@ private fun ResolutionPicker(selected: ResolutionPreset, onSelected: (Resolution
                             text = WormholeServer.resolutionLabel(preset),
                             fontSize = 14.sp,
                             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                            color = if (isSelected) Color(0xFF7DE2CE) else Color(0xFFE2E8F0)
+                            color = if (isSelected) Palette.Accent else Palette.TextSecondary
                         )
                     },
                     onClick = {
@@ -1885,17 +1885,17 @@ private fun MirrorSettingRow(title: String, subtitle: String, checked: Boolean, 
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-            Text(text = title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Color(0xFFE2E8F0))
-            Text(text = subtitle, fontSize = 12.sp, color = Color(0xFF94A3B8))
+            Text(text = title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Palette.TextSecondary)
+            Text(text = subtitle, fontSize = 12.sp, color = Palette.TextMuted)
         }
         Switch(
             checked = checked,
             onCheckedChange = null,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = Color(0xFF09121E),
-                checkedTrackColor = Color(0xFF7DE2CE),
-                uncheckedThumbColor = Color(0xFF94A3B8),
-                uncheckedTrackColor = Color(0xFF1B2B3E)
+                checkedThumbColor = Palette.Background,
+                checkedTrackColor = Palette.Accent,
+                uncheckedThumbColor = Palette.TextMuted,
+                uncheckedTrackColor = Palette.SurfaceVariant
             )
         )
     }
@@ -1917,17 +1917,17 @@ private fun MirrorSettingsDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF142131),
+        containerColor = Palette.Surface,
         shape = RoundedCornerShape(16.dp),
         title = {
-            Text(text = "Settings", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF1F5F9))
+            Text(text = "Settings", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.Text)
         },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(text = "Applies now", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF7DE2CE))
+                Text(text = "Applies now", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.Accent)
                 MirrorSettingRow(
                     title = "Stream Stats",
                     subtitle = "FPS, bitrate, resolution and codec overlay",
@@ -1940,19 +1940,19 @@ private fun MirrorSettingsDialog(
                     checked = audioEnabled,
                     onToggle = { onAudioEnabledChanged(!audioEnabled) }
                 )
-                HorizontalDivider(color = Color(0xFF1F3146), thickness = 0.5.dp)
+                HorizontalDivider(color = Palette.Border, thickness = 0.5.dp)
                 Text(
                     text = "Ends this session; reconnect from Screen Mirroring",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFFFBBF24)
+                    color = Palette.WarningBright
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(text = "Preferred Resolution", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Color(0xFFE2E8F0))
+                    Text(text = "Preferred Resolution", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Palette.TextSecondary)
                     Text(
                         text = "Size offered to the sender; lower is lighter on Wi-Fi",
                         fontSize = 12.sp,
-                        color = Color(0xFF94A3B8)
+                        color = Palette.TextMuted
                     )
                     ResolutionPicker(selected = resolutionPreset, onSelected = onResolutionPresetChanged, fontSize = 12.sp)
                 }
@@ -1967,11 +1967,11 @@ private fun MirrorSettingsDialog(
         confirmButton = {
             Button(
                 onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7DE2CE), contentColor = Color(0xFF09121E))
+                colors = ButtonDefaults.buttonColors(containerColor = Palette.Accent, contentColor = Palette.Background)
             ) { Text("Close") }
         },
         dismissButton = {
-            TextButton(onClick = onDisconnect) { Text("Disconnect", color = Color(0xFFF87171)) }
+            TextButton(onClick = onDisconnect) { Text("Disconnect", color = Palette.Error) }
         }
     )
 }
