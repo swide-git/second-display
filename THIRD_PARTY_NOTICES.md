@@ -1,7 +1,7 @@
 # Third-party notices
 
-Wormhole Display is Copyright © 2026 Piotr Godlewski and licensed under the GNU
-General Public License v3.0 (see [LICENSE](LICENSE)). It includes the following
+Second Display is based on Wormhole Display, Copyright © 2026 Piotr Godlewski,
+and is licensed under the GNU General Public License v3.0 (see [LICENSE](LICENSE)). It includes the following
 third-party components, which remain under their own copyrights and licenses.
 
 | Component | Version | License | Location | Upstream |
