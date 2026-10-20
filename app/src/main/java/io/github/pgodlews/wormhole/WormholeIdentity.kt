@@ -12,6 +12,7 @@ class WormholeIdentity(context: Context) {
     private val prefs = context.getSharedPreferences("identity", Context.MODE_PRIVATE)
     private val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
     private var multicastLock: WifiManager.MulticastLock? = null
+    private var wifiLock: WifiManager.WifiLock? = null
 
     companion object {
         val DEFAULT_SERVICE_NAME: String
@@ -168,5 +169,29 @@ class WormholeIdentity(context: Context) {
     fun releaseMulticastLock() {
         runCatching { multicastLock?.release() }
         multicastLock = null
+    }
+
+    /**
+     * Keeps the Wi-Fi radio out of power save while the receiver runs. Without it the radio
+     * dozes between packets, so a sender sees 100 ms to 1 s round trips and delivers the mirror
+     * stream in bursts. LOW_LATENCY (API 29+) only takes effect while the app is in the
+     * foreground with the screen on, which is exactly when a mirror is being shown.
+     */
+    @Synchronized
+    fun holdWifiLock() {
+        if (wifiLock == null) {
+            @Suppress("DEPRECATION")
+            val mode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q)
+                WifiManager.WIFI_MODE_FULL_LOW_LATENCY else WifiManager.WIFI_MODE_FULL_HIGH_PERF
+            wifiLock = runCatching {
+                wifi.createWifiLock(mode, "wormhole").apply { setReferenceCounted(false); acquire() }
+            }.getOrNull()
+        }
+    }
+
+    @Synchronized
+    fun releaseWifiLock() {
+        runCatching { wifiLock?.release() }
+        wifiLock = null
     }
 }
