@@ -247,7 +247,7 @@ object WormholeServer {
     }
 
     fun setOrientationSetting(setting: ScreenOrientation) {
-        val autoSupported = WormholeIdentity.hasOrientationSensor(appContext, lastRawWidth, lastRawHeight)
+        val autoSupported = WormholeIdentity.hasOrientationSensor(appContext)
         val targetSetting = if (!autoSupported && setting == ScreenOrientation.AUTO) {
             ScreenOrientation.LANDSCAPE
         } else {
@@ -271,7 +271,7 @@ object WormholeServer {
         lastRawWidth = width
         lastRawHeight = height
         lastFps = fps
-        val autoSupported = WormholeIdentity.hasOrientationSensor(appContext, width, height)
+        val autoSupported = WormholeIdentity.hasOrientationSensor(appContext)
         val targetPortrait = when (_orientationSetting.value) {
             ScreenOrientation.PORTRAIT -> true
             ScreenOrientation.LANDSCAPE -> false
@@ -611,7 +611,7 @@ object WormholeServer {
         lastRawHeight = if (metrics.heightPixels > 0) metrics.heightPixels else 1080
         lastFps = fps
 
-        val autoSupported = WormholeIdentity.hasOrientationSensor(context, lastRawWidth, lastRawHeight)
+        val autoSupported = WormholeIdentity.hasOrientationSensor(context)
         val isSysPortrait = context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT ||
                 lastRawWidth < lastRawHeight
         val targetPortrait = when (_orientationSetting.value) {
