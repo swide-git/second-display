@@ -232,7 +232,7 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
   The user-facing name *Second Display* lives in `app_name`, the dashboard title,
   `WormholeIdentity.DEFAULT_SERVICE_NAME` and the service notification texts.
 - **Launcher icon**: adaptive icon in `mipmap-anydpi-v26/ic_launcher.xml` (vector
-  foreground scaled to 66 % to stay in the safe zone, `#09121E` background, monochrome
+  foreground scaled to 66 % to stay in the safe zone, `#121214` background, monochrome
   layer for themed icons). The PNG mipmaps are only legacy fallbacks; the source design
   is `docs/images/second_display_icon.svg`.
 - **Package or class renames**: the JNI functions in `wormhole_jni.c`
