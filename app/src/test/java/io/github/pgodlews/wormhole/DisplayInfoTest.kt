@@ -67,8 +67,8 @@ class DisplayInfoTest {
 
     @Test
     fun `default service name is the same on every device`() {
-        assertEquals("Wormhole Display", WormholeIdentity.DEFAULT_SERVICE_NAME)
-        assertEquals("Wormhole Display", WormholeIdentity.sanitizeServiceName("  "))
+        assertEquals("Second Display", WormholeIdentity.DEFAULT_SERVICE_NAME)
+        assertEquals("Second Display", WormholeIdentity.sanitizeServiceName("  "))
         assertEquals("Living Room", WormholeIdentity.sanitizeServiceName(" Living Room "))
     }
 }

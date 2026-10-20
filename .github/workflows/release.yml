@@ -94,26 +94,26 @@ jobs:
           mkdir -p dist
           if [ -n "${WORMHOLE_KEYSTORE_PATH:-}" ]; then
             ./gradlew --no-daemon :app:assembleRelease
-            cp app/build/outputs/apk/release/app-release.apk dist/wormhole-display.apk
+            cp app/build/outputs/apk/release/app-release.apk dist/second-display.apk
           else
             ./gradlew --no-daemon :app:assembleDebug
-            cp app/build/outputs/apk/debug/app-debug.apk dist/wormhole-display.apk
+            cp app/build/outputs/apk/debug/app-debug.apk dist/second-display.apk
           fi
-          (cd dist && sha256sum wormhole-display.apk > wormhole-display.apk.sha256)
-          cat dist/wormhole-display.apk.sha256
+          (cd dist && sha256sum second-display.apk > second-display.apk.sha256)
+          cat dist/second-display.apk.sha256
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: wormhole-display-${{ env.WORMHOLE_VERSION_NAME }}
-          path: dist/wormhole-display.apk*
+          name: second-display-${{ env.WORMHOLE_VERSION_NAME }}
+          path: dist/second-display.apk*
 
       - name: Publish tagged release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/wormhole-display.apk dist/wormhole-display.apk.sha256 \
+          gh release create "$GITHUB_REF_NAME" dist/second-display.apk dist/second-display.apk.sha256 \
             --verify-tag --generate-notes \
             --title "Wormhole Display $GITHUB_REF_NAME"
 
@@ -124,7 +124,7 @@ jobs:
         run: |
           gh release delete latest --cleanup-tag --yes || true
           gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/latest" > /dev/null 2>&1 || true
-          gh release create latest dist/wormhole-display.apk dist/wormhole-display.apk.sha256 \
+          gh release create latest dist/second-display.apk dist/second-display.apk.sha256 \
             --prerelease --target "$GITHUB_SHA" \
             --title "Wormhole Display (latest main build)" \
             --notes "Automatic build of \`main\` at ${GITHUB_SHA::7} (version $WORMHOLE_VERSION_NAME). For a stable build, use the newest vX.Y.Z release."

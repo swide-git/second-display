@@ -162,10 +162,10 @@ class WormholeService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Wormhole Display Receiver",
+                "Second Display Receiver",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Keeps Wormhole Display active and discoverable in the background"
+                description = "Keeps Second Display active and discoverable in the background"
                 setShowBadge(false)
             }
             val nm = getSystemService(NotificationManager::class.java)
@@ -191,7 +191,7 @@ class WormholeService : Service() {
             Notification.Builder(this)
         }
 
-        builder.setContentTitle("Wormhole Display Receiver")
+        builder.setContentTitle("Second Display Receiver")
             .setContentText(contentText)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)
