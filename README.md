@@ -151,7 +151,7 @@ Build, test and install:
 export SECOND_DISPLAY_VERSION_CODE=30003 SECOND_DISPLAY_VERSION_NAME=0.4.0-dev
 ./gradlew :app:testDebugUnitTest :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell am start -n io.github.swiderekartmax.seconddisplay/io.github.pgodlews.wormhole.MainActivity
+adb shell am start -n io.github.swiderekartmax.seconddisplay/.MainActivity
 ```
 
 `./scripts/build.sh` does the same build and copies the APK to `dist/second-display.apk`.

@@ -388,7 +388,7 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     g_vm = vm;
     if (pthread_key_create(&g_tls_key, tls_detach) != 0) return JNI_ERR;
     JNIEnv *env = env_for_thread();
-    jclass cls = (*env)->FindClass(env, "io/github/pgodlews/wormhole/NativeBridge$Listener");
+    jclass cls = (*env)->FindClass(env, "io/github/swiderekartmax/seconddisplay/NativeBridge$Listener");
     if (!cls) return JNI_ERR;
     g_on_video_frame = (*env)->GetMethodID(env, cls, "onVideoFrame", "([BJJJZ)V");
     g_on_audio_frame = (*env)->GetMethodID(env, cls, "onAudioFrame", "([BJI)V");
@@ -419,14 +419,14 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     return (g_string_class && g_string_from_bytes && g_utf8_charset) ? JNI_VERSION_1_6 : JNI_ERR;
 }
 
-JNIEXPORT void Java_io_github_pgodlews_wormhole_NativeBridge_nativeSetListener(JNIEnv *env, jclass cls, jobject listener) {
+JNIEXPORT void Java_io_github_swiderekartmax_seconddisplay_NativeBridge_nativeSetListener(JNIEnv *env, jclass cls, jobject listener) {
     pthread_mutex_lock(&g_listener_lock);
     if (g_listener) (*env)->DeleteGlobalRef(env, g_listener);
     g_listener = listener ? (*env)->NewGlobalRef(env, listener) : NULL;
     pthread_mutex_unlock(&g_listener_lock);
 }
 
-JNIEXPORT jint Java_io_github_pgodlews_wormhole_NativeBridge_nativeStart(JNIEnv *env, jclass cls,
+JNIEXPORT jint Java_io_github_swiderekartmax_seconddisplay_NativeBridge_nativeStart(JNIEnv *env, jclass cls,
                                                                jstring keyFile, jstring deviceId,
                                                                jstring serviceName,
                                                                jint width, jint height, jint maxFps, jboolean allowHevc) {
@@ -558,14 +558,14 @@ JNIEXPORT jint Java_io_github_pgodlews_wormhole_NativeBridge_nativeStart(JNIEnv 
     return port;
 }
 
-JNIEXPORT jstring Java_io_github_pgodlews_wormhole_NativeBridge_nativePublicKey(JNIEnv *env, jclass cls) {
+JNIEXPORT jstring Java_io_github_swiderekartmax_seconddisplay_NativeBridge_nativePublicKey(JNIEnv *env, jclass cls) {
     pthread_mutex_lock(&g_lock);
     jstring result = g_raop ? (*env)->NewStringUTF(env, raop_get_pk_str(g_raop)) : NULL;
     pthread_mutex_unlock(&g_lock);
     return result;
 }
 
-JNIEXPORT void Java_io_github_pgodlews_wormhole_NativeBridge_nativeStop(JNIEnv *env, jclass cls) {
+JNIEXPORT void Java_io_github_swiderekartmax_seconddisplay_NativeBridge_nativeStop(JNIEnv *env, jclass cls) {
     pthread_mutex_lock(&g_lock);
     /* Stop and join HTTP first: in-flight /info handlers read TXT records from
      * the dnssd object, so it must stay valid until no connection can run.
