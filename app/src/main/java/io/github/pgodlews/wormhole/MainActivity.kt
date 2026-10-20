@@ -21,6 +21,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
@@ -35,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -195,6 +197,8 @@ class MainActivity : ComponentActivity() {
             var runInBackground by remember { mutableStateOf(WormholeServer.runInBackground) }
             var startOnBoot by remember { mutableStateOf(WormholeServer.startOnBoot) }
             var serviceName by remember { mutableStateOf(WormholeServer.identity.serviceName) }
+            val resolutionPreset by WormholeServer.resolutionPreset.collectAsState()
+            var showMirrorSettings by remember { mutableStateOf(false) }
 
             MaterialTheme(
                 colorScheme = darkColorScheme(
@@ -239,6 +243,41 @@ class MainActivity : ComponentActivity() {
                                         .padding(16.dp)
                                 )
                             }
+                            // Long press opens settings without leaving the mirror; Back still disconnects.
+                            Box(
+                                Modifier
+                                    .matchParentSize()
+                                    .pointerInput(Unit) {
+                                        detectTapGestures(onLongPress = { showMirrorSettings = true })
+                                    }
+                            )
+                        }
+                        DisposableEffect(Unit) { onDispose { showMirrorSettings = false } }
+                        if (showMirrorSettings) {
+                            MirrorSettingsDialog(
+                                debugOverlayEnabled = debugOverlayEnabled,
+                                onDebugOverlayEnabledChanged = { enabled ->
+                                    debugOverlayEnabled = enabled
+                                    WormholeServer.setDebugOverlayEnabled(enabled)
+                                },
+                                audioEnabled = audioEnabled,
+                                onAudioEnabledChanged = { enabled ->
+                                    audioEnabled = enabled
+                                    WormholeServer.setAudioEnabled(enabled)
+                                },
+                                resolutionPreset = resolutionPreset,
+                                onResolutionPresetChanged = { WormholeServer.setResolutionPreset(it) },
+                                hevcEnabled = hevcEnabled,
+                                onHevcEnabledChanged = { enabled ->
+                                    hevcEnabled = enabled
+                                    WormholeServer.setHevcEnabled(enabled)
+                                },
+                                onDisconnect = {
+                                    showMirrorSettings = false
+                                    WormholeServer.disconnectClient("settings")
+                                },
+                                onDismiss = { showMirrorSettings = false }
+                            )
                         }
                     } else if (audioStreaming) {
                         // Audio-only AirPlay (speaker) session: full-screen now playing, left with Back/Home like mirroring.
@@ -296,7 +335,9 @@ class MainActivity : ComponentActivity() {
                             },
                             recentConnections = recentConnections,
                             orientationSetting = orientationSetting,
-                            onOrientationSettingChanged = { WormholeServer.setOrientationSetting(it) }
+                            onOrientationSettingChanged = { WormholeServer.setOrientationSetting(it) },
+                            resolutionPreset = resolutionPreset,
+                            onResolutionPresetChanged = { WormholeServer.setResolutionPreset(it) }
                         )
 
                         orientationNotice?.let { notice ->
@@ -446,7 +487,9 @@ private fun DashboardScreen(
     onRestartServer: () -> Unit,
     recentConnections: List<ConnectionEntry>,
     orientationSetting: ScreenOrientation,
-    onOrientationSettingChanged: (ScreenOrientation) -> Unit
+    onOrientationSettingChanged: (ScreenOrientation) -> Unit,
+    resolutionPreset: ResolutionPreset,
+    onResolutionPresetChanged: (ResolutionPreset) -> Unit
 ) {
     var showNameDialog by remember { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
@@ -597,6 +640,42 @@ private fun DashboardScreen(
                                 }
                             }
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(dividerSpacing))
+                    HorizontalDivider(color = Color(0xFF1F3146), thickness = 0.5.dp)
+                    Spacer(modifier = Modifier.height(dividerSpacing))
+
+                    // Row 0b: Preferred Resolution
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                horizontal = if (isTvOrCompact) 8.dp else 10.dp,
+                                vertical = if (isTvOrCompact) 1.dp else 6.dp
+                            ),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                            Text(
+                                text = "Preferred Resolution",
+                                fontSize = if (isTvOrCompact) 12.sp else 15.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFFE2E8F0)
+                            )
+                            Text(
+                                text = "Size offered to the sender; lower is lighter on Wi-Fi",
+                                fontSize = if (isTvOrCompact) 10.sp else 12.sp,
+                                color = Color(0xFF94A3B8)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        ResolutionPicker(
+                            selected = resolutionPreset,
+                            onSelected = onResolutionPresetChanged,
+                            fontSize = if (isTvOrCompact) 9.sp else 11.sp
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(dividerSpacing))
@@ -1666,7 +1745,7 @@ private fun OrientationNoticeDialog(
         shape = RoundedCornerShape(16.dp),
         title = {
             Text(
-                text = "Display Rotated",
+                text = if (notice.resolutionChange) "Resolution Changed" else "Display Rotated",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFFF1F5F9)
@@ -1675,7 +1754,8 @@ private fun OrientationNoticeDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "Display orientation changed to $mode (${notice.width} × ${notice.height}).",
+                    text = if (notice.resolutionChange) "Advertised resolution changed to ${notice.width} × ${notice.height}."
+                           else "Display orientation changed to $mode (${notice.width} × ${notice.height}).",
                     fontSize = 14.sp,
                     color = Color(0xFFF1F5F9),
                     fontWeight = FontWeight.Medium
@@ -1711,3 +1791,155 @@ private fun OrientationNoticeDialog(
     )
 }
 
+
+@Composable
+private fun ResolutionPicker(selected: ResolutionPreset, onSelected: (ResolutionPreset) -> Unit, fontSize: TextUnit) {
+    var expanded by remember { mutableStateOf(false) }
+    val available = WormholeServer.availableResolutionPresets()
+    // A preset that does not fit this panel is not applied; show what is actually advertised.
+    val effective = if (selected in available) selected else ResolutionPreset.NATIVE
+    Box {
+        Surface(
+            shape = RoundedCornerShape(6.dp),
+            color = Color(0xFF1E5246),
+            border = BorderStroke(1.dp, Color(0xFF7DE2CE)),
+            modifier = Modifier
+                .tvFocusable(shape = RoundedCornerShape(6.dp), onClick = { expanded = true })
+                .clickable { expanded = true }
+        ) {
+            Text(
+                text = "${WormholeServer.resolutionLabel(effective)}  ▾",
+                fontSize = fontSize,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF7DE2CE),
+                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = Color(0xFF142131)
+        ) {
+            available.forEach { preset ->
+                val isSelected = preset == effective
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = WormholeServer.resolutionLabel(preset),
+                            fontSize = 14.sp,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (isSelected) Color(0xFF7DE2CE) else Color(0xFFE2E8F0)
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onSelected(preset)
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MirrorSettingRow(title: String, subtitle: String, checked: Boolean, onToggle: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .tvFocusable(shape = RoundedCornerShape(8.dp), onClick = onToggle)
+            .clickable { onToggle() }
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(text = title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Color(0xFFE2E8F0))
+            Text(text = subtitle, fontSize = 12.sp, color = Color(0xFF94A3B8))
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = null,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color(0xFF09121E),
+                checkedTrackColor = Color(0xFF7DE2CE),
+                uncheckedThumbColor = Color(0xFF94A3B8),
+                uncheckedTrackColor = Color(0xFF1B2B3E)
+            )
+        )
+    }
+}
+
+/** Opened by a long press on the mirror. Live toggles apply at once; the rest end the session. */
+@Composable
+private fun MirrorSettingsDialog(
+    debugOverlayEnabled: Boolean,
+    onDebugOverlayEnabledChanged: (Boolean) -> Unit,
+    audioEnabled: Boolean,
+    onAudioEnabledChanged: (Boolean) -> Unit,
+    resolutionPreset: ResolutionPreset,
+    onResolutionPresetChanged: (ResolutionPreset) -> Unit,
+    hevcEnabled: Boolean,
+    onHevcEnabledChanged: (Boolean) -> Unit,
+    onDisconnect: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF142131),
+        shape = RoundedCornerShape(16.dp),
+        title = {
+            Text(text = "Settings", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF1F5F9))
+        },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(text = "Applies now", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF7DE2CE))
+                MirrorSettingRow(
+                    title = "Stream Stats",
+                    subtitle = "FPS, bitrate, resolution and codec overlay",
+                    checked = debugOverlayEnabled,
+                    onToggle = { onDebugOverlayEnabledChanged(!debugOverlayEnabled) }
+                )
+                MirrorSettingRow(
+                    title = "Speaker Output",
+                    subtitle = if (audioEnabled) "Play sound through device speakers" else "Device speakers muted",
+                    checked = audioEnabled,
+                    onToggle = { onAudioEnabledChanged(!audioEnabled) }
+                )
+                HorizontalDivider(color = Color(0xFF1F3146), thickness = 0.5.dp)
+                Text(
+                    text = "Ends this session; reconnect from Screen Mirroring",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFFFBBF24)
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(text = "Preferred Resolution", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Color(0xFFE2E8F0))
+                    Text(
+                        text = "Size offered to the sender; lower is lighter on Wi-Fi",
+                        fontSize = 12.sp,
+                        color = Color(0xFF94A3B8)
+                    )
+                    ResolutionPicker(selected = resolutionPreset, onSelected = onResolutionPresetChanged, fontSize = 12.sp)
+                }
+                MirrorSettingRow(
+                    title = "H.265 / HEVC Video",
+                    subtitle = "Lower bitrate when the sender agrees to use it",
+                    checked = hevcEnabled,
+                    onToggle = { onHevcEnabledChanged(!hevcEnabled) }
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7DE2CE), contentColor = Color(0xFF09121E))
+            ) { Text("Close") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDisconnect) { Text("Disconnect", color = Color(0xFFF87171)) }
+        }
+    )
+}

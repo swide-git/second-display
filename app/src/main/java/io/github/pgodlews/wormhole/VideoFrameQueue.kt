@@ -141,6 +141,7 @@ internal class VideoFrameQueue(
     }
 
     @Synchronized fun peek(): Frame? = frames.peekFirst()
+    @Synchronized fun depth(): Int = frames.size
     @Synchronized fun consumed(frame: Frame) {
         if (frames.peekFirst() === frame) {
             frames.removeFirst()
