@@ -24,7 +24,7 @@ target_compile_definitions(mirror-core PRIVATE
     OPENSSL_API_COMPAT=0x10101000L)
 target_compile_options(mirror-core PRIVATE -w)
 
-# Clean-room ALAC decoder (GPLv3, part of this project): Portal has no MediaCodec ALAC.
+# Clean-room ALAC decoder (GPLv3, part of this project): Android devices generally have no MediaCodec ALAC.
 add_library(alac-decoder STATIC ${CMAKE_CURRENT_SOURCE_DIR}/alac/alac_decoder.c)
 target_include_directories(alac-decoder PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/alac)
 

@@ -39,11 +39,11 @@ class ResolutionPresetTest {
     }
 
     @Test fun `presets larger than the panel are not offered`() {
-        val portalMini = ResolutionPreset.available(1280, 800)
-        assertFalse(ResolutionPreset.FHD in portalMini)
-        assertFalse(ResolutionPreset.WXGA_PLUS in portalMini)
+        val panel1280x800 = ResolutionPreset.available(1280, 800)
+        assertFalse(ResolutionPreset.FHD in panel1280x800)
+        assertFalse(ResolutionPreset.WXGA_PLUS in panel1280x800)
         // 1280x720 (921k px) outranks 80% = 1024x640 (655k px).
-        assertEquals(listOf(ResolutionPreset.NATIVE, ResolutionPreset.HD, ResolutionPreset.P80, ResolutionPreset.P64, ResolutionPreset.P50), portalMini)
+        assertEquals(listOf(ResolutionPreset.NATIVE, ResolutionPreset.HD, ResolutionPreset.P80, ResolutionPreset.P64, ResolutionPreset.P50), panel1280x800)
     }
 
     @Test fun `unknown or missing id falls back to native`() {
