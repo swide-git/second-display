@@ -145,7 +145,7 @@ Build, test and install:
 
 ```bash
 # A local build is versionCode 1 unless set; use a value above the one installed.
-export WORMHOLE_VERSION_CODE=30003 WORMHOLE_VERSION_NAME=0.4.0-dev
+export SECOND_DISPLAY_VERSION_CODE=30003 SECOND_DISPLAY_VERSION_NAME=0.4.0-dev
 ./gradlew :app:testDebugUnitTest :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -n io.github.swiderekartmax.seconddisplay/io.github.pgodlews.wormhole.MainActivity
@@ -159,7 +159,7 @@ Protocol details, contributor notes and troubleshooting: [AGENTS.md](AGENTS.md) 
 
 ### Releases (GitHub Actions)
 
-`.github/workflows/release.yml` builds pull requests, publishes a rolling `latest` pre-release on pushes to `main`, and a release on `vX.Y.Z` tags. Signed builds need the repository secrets `WORMHOLE_KEYSTORE_BASE64`, `WORMHOLE_KEYSTORE_PASSWORD`, `WORMHOLE_KEY_ALIAS` and `WORMHOLE_KEY_PASSWORD`; without them pushes to `main` and tags fail instead of publishing unsigned APKs.
+`.github/workflows/release.yml` builds pull requests, publishes a rolling `latest` pre-release on pushes to `main`, and a release on `vX.Y.Z` tags. Signed builds need the repository secrets `SECOND_DISPLAY_KEYSTORE_BASE64`, `SECOND_DISPLAY_KEYSTORE_PASSWORD`, `SECOND_DISPLAY_KEY_ALIAS` and `SECOND_DISPLAY_KEY_PASSWORD`; without them pushes to `main` and tags fail instead of publishing unsigned APKs.
 
 ---
 
