@@ -5,6 +5,14 @@
   <p>AirPlay-compatible screen mirroring &amp; extended display receiver.</p>
 </div>
 
+> **About this fork.** This build targets ordinary **Android 11+ phones and tablets** (arm64)
+> instead of Meta Portals (Android 9-10, not supported here). Changes from upstream:
+> fixed launch crash on Android 11+, targetSdk 35 (Android 13+ notification permission,
+> Android 14 foreground-service type, Android 15 edge-to-edge), a larger decoder buffer and a
+> low-latency Wi-Fi lock so sessions survive Wi-Fi stalls, a settings dialog on long press
+> during a session, and a preferred-resolution setting. Upstream:
+> [pgodlews/wormhole-display](https://github.com/pgodlews/wormhole-display).
+
 > *"A wormhole connects two distant points in spacetime. Wormhole Display bridges two ecosystems that were never meant to talk to each other..."*
 
 <p align="center">

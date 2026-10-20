@@ -1,7 +1,9 @@
 package io.github.pgodlews.wormhole
 
+import android.Manifest
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.net.Uri
@@ -150,14 +152,16 @@ class MainActivity : ComponentActivity() {
  
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
-        }
+        setShowWhenLocked(true)
+        setTurnScreenOn(true)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or
-                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        // Android 15 draws edge to edge for targetSdk 35; keep the bars hidden (swipe shows them
+        // transiently) and let the mirror use the cutout area too.
+        window.setDecorFitsSystemWindows(false)
+        window.attributes = window.attributes.apply {
+            layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+        }
+        requestNotificationPermission()
 
         WormholeServer.init(applicationContext)
 
@@ -352,6 +356,28 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // Re-applied on focus: dialogs and the transient swipe can bring the bars back.
+        if (hasFocus) hideSystemBars()
+    }
+
+    private fun hideSystemBars() {
+        window.insetsController?.apply {
+            hide(android.view.WindowInsets.Type.systemBars())
+            systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
+
+    private fun requestNotificationPermission() {
+        // Android 13+: asked once; if declined the receiver still runs, only its notification is hidden.
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQUEST_NOTIFICATIONS)
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         WormholeServer.isActivityResumed = true
@@ -409,6 +435,10 @@ class MainActivity : ComponentActivity() {
             WormholeServer.stopServer()
         }
         super.onDestroy()
+    }
+
+    private companion object {
+        const val REQUEST_NOTIFICATIONS = 1
     }
 }
 
@@ -517,6 +547,8 @@ private fun DashboardScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            // The window extends into the cutout (edge to edge); keep text clear of the camera.
+            .windowInsetsPadding(WindowInsets.displayCutout)
             .padding(horizontal = horizontalPadding, vertical = verticalPadding)
     ) {
         // Header
