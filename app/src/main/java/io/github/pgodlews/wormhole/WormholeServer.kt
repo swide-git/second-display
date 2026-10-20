@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.hardware.display.DisplayManager
 import android.os.SystemClock
 import android.util.DisplayMetrics
 import android.util.Log
@@ -76,6 +77,7 @@ object WormholeServer {
         val isPortrait: Boolean,
         val width: Int,
         val height: Int,
+        val resolutionChange: Boolean = false,
         val timestamp: Long = System.currentTimeMillis()
     )
 
@@ -89,6 +91,23 @@ object WormholeServer {
     private var lastRawWidth = 1920
     private var lastRawHeight = 1080
     private var lastFps = 60
+
+    private val _resolutionPreset = MutableStateFlow(ResolutionPreset.NATIVE)
+    val resolutionPreset: StateFlow<ResolutionPreset> = _resolutionPreset.asStateFlow()
+
+    /** Advertised resolution for [preset], for labels in the settings UI. */
+    fun resolutionLabel(preset: ResolutionPreset): String =
+        preset.label(lastRawWidth, lastRawHeight, _isPortrait.value)
+
+    fun availableResolutionPresets(): List<ResolutionPreset> =
+        ResolutionPreset.available(lastRawWidth, lastRawHeight)
+
+    private fun scaledDisplayInfo(portrait: Boolean): DisplayInfo {
+        // A preset saved on a larger panel setting may not fit this one.
+        val preset = _resolutionPreset.value.takeIf { it.fits(lastRawWidth, lastRawHeight) } ?: ResolutionPreset.NATIVE
+        val (w, h) = preset.size(lastRawWidth, lastRawHeight)
+        return computeDisplayInfo(w, h, lastFps, portrait)
+    }
 
     var audioEnabled: Boolean = true
         private set
@@ -163,6 +182,7 @@ object WormholeServer {
         hevcEnabled = prefs.getBoolean("hevc_enabled", false)
         runInBackground = prefs.getBoolean("run_in_background", true)
         startOnBoot = prefs.getBoolean("start_on_boot", true)
+        _resolutionPreset.value = ResolutionPreset.fromId(prefs.getString("resolution_preset", null))
 
         audioRenderer.audioEnabled = audioEnabled
 
@@ -201,6 +221,14 @@ object WormholeServer {
         hevcFailedThisProcess.set(false)
         prefs.edit().putBoolean("hevc_enabled", enabled).apply()
         restartServer()
+    }
+
+    /** Senders only read the resolution at session start, so a live session is ended. */
+    fun setResolutionPreset(preset: ResolutionPreset) {
+        if (_resolutionPreset.value == preset) return
+        _resolutionPreset.value = preset
+        prefs.edit().putString("resolution_preset", preset.id).apply()
+        applyOrientation(_isPortrait.value, resolutionChange = true)
     }
 
     fun setRunInBackground(enabled: Boolean) {
@@ -252,16 +280,17 @@ object WormholeServer {
         applyOrientation(targetPortrait)
     }
 
-    private fun applyOrientation(targetPortrait: Boolean) {
+    private fun applyOrientation(targetPortrait: Boolean, resolutionChange: Boolean = false) {
         val orientationChanged = _isPortrait.value != targetPortrait
         _isPortrait.value = targetPortrait
-        val newDisplay = computeDisplayInfo(lastRawWidth, lastRawHeight, lastFps, targetPortrait)
+        val newDisplay = scaledDisplayInfo(targetPortrait)
         val displayChanged = newDisplay != _displayInfo.value
         if (displayChanged || orientationChanged) {
             _displayInfo.value = newDisplay
             if (_isMirroring.value) {
-                Log.i(TAG, "Disconnecting client: orientation_changed (${if (targetPortrait) "portrait" else "landscape"})")
-                _orientationNotice.value = OrientationNotice(targetPortrait, newDisplay.width, newDisplay.height)
+                val cause = if (resolutionChange) "resolution_changed" else "orientation_changed"
+                Log.i(TAG, "Disconnecting client: $cause (${newDisplay.width}x${newDisplay.height}, ${if (targetPortrait) "portrait" else "landscape"})")
+                _orientationNotice.value = OrientationNotice(targetPortrait, newDisplay.width, newDisplay.height, resolutionChange)
             }
             if (isServerRunning()) {
                 restartServer()
@@ -289,6 +318,7 @@ object WormholeServer {
                     _statusText.value = "Starting receiver…"
                 }
                 identity.holdMulticastLock()
+                identity.holdWifiLock()
                 callbacksEnabled.set(true)
                 NativeBridge.nativeSetListener(listener)
                 renderer.hevcDecoder = if (requestHevc && !hevcFailedThisProcess.get()) VideoDecoderSupport.findHevc(
@@ -318,6 +348,7 @@ object WormholeServer {
                     NativeBridge.nativeStop()
                 } finally {
                     identity.releaseMulticastLock()
+                    identity.releaseWifiLock()
                 }
             },
             failed = { error ->
@@ -561,8 +592,11 @@ object WormholeServer {
     private fun queryDisplayInfo(context: Context): DisplayInfo {
         val wm = context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
         val metrics = DisplayMetrics()
+        // init() receives the application context, which has no associated display: on API 30+
+        // Context.display throws UnsupportedOperationException for it. DisplayManager works with
+        // any context and returns the same default display.
         val display = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            context.display
+            context.getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY)
         } else {
             @Suppress("DEPRECATION")
             wm?.defaultDisplay
@@ -586,6 +620,6 @@ object WormholeServer {
             ScreenOrientation.AUTO -> if (!autoSupported) false else isSysPortrait
         }
         _isPortrait.value = targetPortrait
-        return computeDisplayInfo(lastRawWidth, lastRawHeight, lastFps, targetPortrait)
+        return scaledDisplayInfo(targetPortrait)
     }
 }

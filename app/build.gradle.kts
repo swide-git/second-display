@@ -33,8 +33,9 @@ android {
     }
     defaultConfig {
         applicationId = "io.github.pgodlews.wormhole"
-        minSdk = 28
-        targetSdk = 29
+        // Android 11+ phones and tablets. Portals (Android 9-10) are not supported by this build.
+        minSdk = 30
+        targetSdk = 35
         versionCode = wormholeVersionCode
         versionName = wormholeVersionName
         ndk { abiFilters += "arm64-v8a" }
@@ -46,11 +47,6 @@ android {
         }
     }
     externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt") } }
-    lint {
-        // targetSdk 29 is deliberate (Portal runs API 28–29; APKs are sideloaded, not published on Play).
-        // Keep the Play-policy check visible as a warning instead of failing release builds.
-        warning += "ExpiredTargetSdkVersion"
-    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
