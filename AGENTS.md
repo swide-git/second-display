@@ -25,7 +25,7 @@ app/src/main/cpp/uxplay/lib/mdnsd/        embedded mDNS responder (the Bonjour a
 app/src/main/cpp/wormhole_jni.c           JNI shim: server lifecycle + all raop callbacks
 app/src/main/cpp/dmap.c                   DMAP parser for now-playing metadata (title/artist/album/year)
 app/src/main/cpp/deps/                    committed prebuilt static libs (openssl, plist)
-app/src/main/java/io/github/pgodlews/wormhole/
+app/src/main/java/io/github/swiderekartmax/seconddisplay/
     MainActivity.kt                       Compose dashboard + video surface
     WormholeService.kt                    foreground service: keeps the receiver discoverable, boot autostart
     WormholeServer.kt                     process-wide owner of the native server, renderers and UI state
@@ -61,7 +61,7 @@ so future upgrades remain diffable.
 ```bash
 ./scripts/build.sh
 adb install -r dist/second-display.apk
-adb shell am start -n io.github.swiderekartmax.seconddisplay/io.github.pgodlews.wormhole.MainActivity
+adb shell am start -n io.github.swiderekartmax.seconddisplay/.MainActivity
 ```
 
 The device is reachable over ADB via USB or wireless debugging. Device and sender
@@ -224,20 +224,19 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
   cutout and the dashboard pads `WindowInsets.displayCutout` (Android 15 edge to
   edge). Inside `MainActivity`, refer to `android.view.WindowInsets` by its full
   name: the Compose `WindowInsets` from `foundation.layout.*` has the same name.
-- **Application ID vs package**: `applicationId` is `io.github.swiderekartmax.seconddisplay`
-  (the installed app, its data, `pm`/`appops`/`adb` commands), while the Kotlin package
-  and `namespace` stay `io.github.pgodlews.wormhole` because the JNI symbols encode it.
-  Hence `am start` needs the full class name:
-  `io.github.swiderekartmax.seconddisplay/io.github.pgodlews.wormhole.MainActivity`.
-  The user-facing name *Second Display* lives in `app_name`, the dashboard title,
+- **Application ID and package**: both are `io.github.swiderekartmax.seconddisplay`
+  (`applicationId`, `namespace`, Kotlin package). The JNI function names in
+  `wormhole_jni.c` (`Java_io_github_swiderekartmax_seconddisplay_NativeBridge_*`) and the
+  `FindClass` string encode that package; see "Package or class renames". The
+  user-facing name *Second Display* lives in `app_name`, the dashboard title,
   `WormholeIdentity.DEFAULT_SERVICE_NAME` and the service notification texts.
 - **Launcher icon**: adaptive icon in `mipmap-anydpi-v26/ic_launcher.xml` (vector
   foreground scaled to 66 % to stay in the safe zone, `#121214` background, monochrome
   layer for themed icons). The PNG mipmaps are only legacy fallbacks; the source design
   is `docs/images/second_display_icon.svg`.
 - **Package or class renames**: the JNI functions in `wormhole_jni.c`
-  (`Java_io_github_pgodlews_wormhole_NativeBridge_*`) and the
-  `FindClass("io/github/pgodlews/wormhole/NativeBridge$Listener")` string encode
+  (`Java_io_github_swiderekartmax_seconddisplay_NativeBridge_*`) and the
+  `FindClass("io/github/swiderekartmax/seconddisplay/NativeBridge$Listener")` string encode
   the Kotlin package and class names. The build does not catch a mismatch; it
   fails at runtime. The native library name `wormhole` must match
   `System.loadLibrary` in `NativeBridge.kt` and the CMake target in

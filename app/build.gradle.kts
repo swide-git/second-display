@@ -11,7 +11,7 @@ val wormholeVersionCode = providers.environmentVariable("SECOND_DISPLAY_VERSION_
 val releaseKeystorePath = providers.environmentVariable("SECOND_DISPLAY_KEYSTORE_PATH").orNull?.takeIf { it.isNotEmpty() }
 
 android {
-    namespace = "io.github.pgodlews.wormhole"
+    namespace = "io.github.swiderekartmax.seconddisplay"
     compileSdk = 35
     ndkVersion = "27.3.13750724"
     val bundledNdk = File(rootDir, ".tools/ndk-r27d")
@@ -32,7 +32,6 @@ android {
         }
     }
     defaultConfig {
-        // The Kotlin package and JNI symbols stay io.github.pgodlews.wormhole; only the app identity changes.
         applicationId = "io.github.swiderekartmax.seconddisplay"
         // Android 11+ phones and tablets. Portals (Android 9-10) are not supported by this build.
         minSdk = 30
