@@ -25,8 +25,7 @@ class WormholeIdentity(context: Context) {
                 return true
             }
             val pm = context.packageManager
-            return pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK) ||
-                pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TELEVISION)
+            return pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)
         }
 
         /** Auto rotation needs an accelerometer and makes no sense on a TV. */

@@ -1,6 +1,9 @@
 package io.github.pgodlews.wormhole
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import java.net.Inet4Address
 import java.net.NetworkInterface
@@ -48,12 +51,14 @@ object NetworkInfoHelper {
 
     private fun getWifiInfo(context: Context): Pair<String, Boolean> {
         return try {
-            val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
-            val info = wifi?.connectionInfo
-            val ssid = info?.ssid?.removeSurrounding("\"")
-            if (ssid != null && ssid != "<unknown ssid>" && ssid.isNotBlank()) {
+            // WifiManager.connectionInfo is deprecated; the active network's transport info
+            // carries the same WifiInfo (the SSID is redacted without location permission).
+            val cm = context.getSystemService(ConnectivityManager::class.java)
+            val caps = cm?.getNetworkCapabilities(cm.activeNetwork)
+            val ssid = (caps?.transportInfo as? WifiInfo)?.ssid?.removeSurrounding("\"")
+            if (ssid != null && ssid != WifiManager.UNKNOWN_SSID && ssid.isNotBlank()) {
                 Pair(ssid, true)
-            } else if (getLocalIpAddress() != null) {
+            } else if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true || getLocalIpAddress() != null) {
                 Pair("Wi-Fi Connected", true)
             } else {
                 Pair("Disconnected", false)
