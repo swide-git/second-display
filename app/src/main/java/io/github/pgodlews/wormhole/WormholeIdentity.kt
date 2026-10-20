@@ -174,17 +174,16 @@ class WormholeIdentity(context: Context) {
     /**
      * Keeps the Wi-Fi radio out of power save while the receiver runs. Without it the radio
      * dozes between packets, so a sender sees 100 ms to 1 s round trips and delivers the mirror
-     * stream in bursts. LOW_LATENCY (API 29+) only takes effect while the app is in the
-     * foreground with the screen on, which is exactly when a mirror is being shown.
+     * stream in bursts. LOW_LATENCY only takes effect while the app is in the foreground with
+     * the screen on, which is exactly when a mirror is being shown.
      */
     @Synchronized
     fun holdWifiLock() {
         if (wifiLock == null) {
-            @Suppress("DEPRECATION")
-            val mode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q)
-                WifiManager.WIFI_MODE_FULL_LOW_LATENCY else WifiManager.WIFI_MODE_FULL_HIGH_PERF
             wifiLock = runCatching {
-                wifi.createWifiLock(mode, "wormhole").apply { setReferenceCounted(false); acquire() }
+                wifi.createWifiLock(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, "wormhole").apply {
+                    setReferenceCounted(false); acquire()
+                }
             }.getOrNull()
         }
     }
