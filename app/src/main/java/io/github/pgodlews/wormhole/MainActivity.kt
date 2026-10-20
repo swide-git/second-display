@@ -107,7 +107,7 @@ fun computeDisplayInfo(rawWidth: Int, rawHeight: Int, refreshRate: Int, isPortra
         }
     } else {
         when {
-            // 10:16 (0.625) - e.g. 800x1280 (8" Portal Mini)
+            // 10:16 (0.625) - e.g. 800x1280
             kotlin.math.abs(ratio - 10.0 / 16.0) < 0.05 -> {
                 "10:16" to "$w × $h (Default) • 900 × 1440 • 1050 × 1680 • 1200 × 1920"
             }
@@ -115,7 +115,7 @@ fun computeDisplayInfo(rawWidth: Int, rawHeight: Int, refreshRate: Int, isPortra
             kotlin.math.abs(ratio - 2.0 / 3.0) < 0.05 -> {
                 "2:3" to "$w × $h (Default) • 1080 × 1620 • 896 × 1344 • 720 × 1080"
             }
-            // 9:16 (0.5625) - e.g. 1080x1920 (Portal+ Gen 1)
+            // 9:16 (0.5625) - e.g. 1080x1920
             kotlin.math.abs(ratio - 9.0 / 16.0) < 0.05 -> {
                 "9:16" to if (h >= 3840) "$w × $h (Default) • 1440 × 2560 • 1080 × 1920 • 720 × 1280"
                          else if (h >= 2560) "$w × $h (Default) • 1080 × 1920 • 900 × 1600 • 720 × 1280"
