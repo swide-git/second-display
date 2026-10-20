@@ -15,7 +15,7 @@ class WormholeIdentity(context: Context) {
     private var wifiLock: WifiManager.WifiLock? = null
 
     companion object {
-        const val DEFAULT_SERVICE_NAME = "Wormhole Display"
+        const val DEFAULT_SERVICE_NAME = "Second Display"
 
         /** Android TV / Google TV: the system UI mode or the leanback/television feature. */
         fun isTvDevice(context: Context? = null): Boolean {
