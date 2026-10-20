@@ -10,8 +10,8 @@ class WormholeIdentityTest {
         assertEquals(WormholeIdentity.DEFAULT_SERVICE_NAME, WormholeIdentity.sanitizeServiceName(null))
         assertEquals(WormholeIdentity.DEFAULT_SERVICE_NAME, WormholeIdentity.sanitizeServiceName(""))
         assertEquals(WormholeIdentity.DEFAULT_SERVICE_NAME, WormholeIdentity.sanitizeServiceName("   "))
-        assertEquals(WormholeIdentity.DEFAULT_SERVICE_NAME, WormholeIdentity.sanitizeServiceName("Wormhole Display"))
-        assertEquals(WormholeIdentity.DEFAULT_SERVICE_NAME, WormholeIdentity.sanitizeServiceName("  Wormhole Display  "))
+        assertEquals(WormholeIdentity.DEFAULT_SERVICE_NAME, WormholeIdentity.sanitizeServiceName("Second Display"))
+        assertEquals(WormholeIdentity.DEFAULT_SERVICE_NAME, WormholeIdentity.sanitizeServiceName("  Second Display  "))
     }
 
     @Test

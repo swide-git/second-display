@@ -12,7 +12,7 @@ import time
 import uuid
 
 REPO = Path(__file__).resolve().parent.parent
-PACKAGE = "io.github.pgodlews.wormhole"
+PACKAGE = "io.github.swiderekartmax.seconddisplay"
 
 
 def main():
@@ -62,7 +62,7 @@ def main():
         "sourceStatus": subprocess.check_output(["git", "status", "--short"], cwd=REPO, text=True),
         "note": "Receiver release requests are not physical presentation or end-to-end latency.",
     }
-    apk = REPO / "dist/wormhole-display.apk"
+    apk = REPO / "dist/second-display.apk"
     if apk.exists():
         metadata["localApkSha256"] = hashlib.sha256(apk.read_bytes()).hexdigest()
     capture("device.txt", "shell", "getprop")
@@ -101,7 +101,7 @@ data_sources { config { name: "linux.ftrace" ftrace_config {
   atrace_categories: "gfx"
   atrace_categories: "view"
   atrace_categories: "video"
-  atrace_apps: "io.github.pgodlews.wormhole"
+  atrace_apps: "io.github.swiderekartmax.seconddisplay"
 } } }
 ''' + f"duration_ms: {args.trace_seconds * 1000}\n"
             (output / "trace-config.pbtxt").write_text(config)

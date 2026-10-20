@@ -1,6 +1,6 @@
 # Sharp text from macOS on an Android display
 
-Why text can look soft when a Mac extends or mirrors to Wormhole Display over AirPlay, and what to do about it. The examples use a 2000×1200 tablet; the same reasoning applies to any panel.
+Why text can look soft when a Mac extends or mirrors to Second Display over AirPlay, and what to do about it. The examples use a 2000×1200 tablet; the same reasoning applies to any panel.
 
 ---
 
@@ -19,7 +19,7 @@ Why text can look soft when a Mac extends or mirrors to Wormhole Display over Ai
 ## 2. Fixes, from quickest to best
 
 ### Step 1: Extend, do not mirror
-In **System Settings → Displays**, select the Wormhole display and set **Use as → Extended display**. This removes the fractional downscale of the built-in screen.
+In **System Settings → Displays**, select the Second Display and set **Use as → Extended display**. This removes the fractional downscale of the built-in screen.
 
 ### Step 2: Zoom the apps you read in
 In the browser, Slack, VS Code and similar, press **Cmd +** to 110-125 %. Strokes two or three pixels wide survive compression far better than one-pixel strokes.
@@ -35,7 +35,7 @@ Alternatively keep **Native** and, in **System Settings → Displays**, turn on 
    ```bash
    brew install --cask betterdisplay
    ```
-2. In its menu bar icon select the Wormhole display and enable **HiDPI**.
+2. In its menu bar icon select the Second Display and enable **HiDPI**.
 3. Pick a HiDPI mode around half the advertised size, e.g. **1000 × 600 HiDPI** for a 2000×1200 panel.
 
 macOS then renders at 2× with full vector glyph sharpness and sends the result at the advertised size.

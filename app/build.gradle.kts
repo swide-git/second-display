@@ -32,7 +32,8 @@ android {
         }
     }
     defaultConfig {
-        applicationId = "io.github.pgodlews.wormhole"
+        // The Kotlin package and JNI symbols stay io.github.pgodlews.wormhole; only the app identity changes.
+        applicationId = "io.github.swiderekartmax.seconddisplay"
         // Android 11+ phones and tablets. Portals (Android 9-10) are not supported by this build.
         minSdk = 30
         targetSdk = 35
