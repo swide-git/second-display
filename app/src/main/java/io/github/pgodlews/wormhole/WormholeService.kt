@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
@@ -40,10 +41,12 @@ class WormholeService : Service() {
             val intent = Intent(context, WormholeService::class.java).apply {
                 action = ACTION_START
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Android 12+ refuses foreground-service starts from the background outside the
+            // exempt paths (activity in front, boot, package replaced); never crash the caller.
+            try {
                 context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            } catch (e: IllegalStateException) {
+                Log.w(TAG, "Foreground service start not allowed now: ${e.message}")
             }
         }
 
@@ -64,7 +67,12 @@ class WormholeService : Service() {
         Log.i(TAG, "Creating WormholeService")
 
         createNotificationChannel()
-        startForeground(NOTIFICATION_ID, buildNotification("Initializing receiver…"))
+        // Android 14+ requires the type at runtime to match the manifest declaration.
+        startForeground(
+            NOTIFICATION_ID,
+            buildNotification("Initializing receiver…"),
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+        )
 
         val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
         wakeLock = powerManager?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "wormhole:receiver_wakelock")?.apply {

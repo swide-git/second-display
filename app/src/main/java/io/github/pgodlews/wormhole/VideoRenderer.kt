@@ -16,9 +16,12 @@ class VideoRenderer(
     private val onVideoSizeChanged: (width: Int, height: Int) -> Unit = { _, _ -> },
     val telemetry: StreamTelemetry = StreamTelemetry()
 ) {
-    // Some devices take ~500 ms to create the surface/decoder. The 12-frame steady
-    // budget alone can discard the startup IDR before the first codec submission.
-    private val input = VideoFrameQueue(startupMaxFrames = 60)
+    // Some devices take ~500 ms to create the surface/decoder; the startup budget keeps
+    // the first IDR through that. The steady budget absorbs the burst a sender delivers
+    // after a Wi-Fi stall: overflowing drops the prediction chain, the receiver cannot
+    // request a new IDR, and the session is torn down. ~1.5 s at 60 fps is cheap for a
+    // hardware decoder to catch up on (one submission per 4 ms tick).
+    private val input = VideoFrameQueue(maxFrames = STEADY_MAX_FRAMES, startupMaxFrames = STARTUP_MAX_FRAMES)
     private val stateLock = Any()
     private var surface: Surface? = null
     private var active = false
@@ -36,6 +39,7 @@ class VideoRenderer(
     private var lastLog = 0L
     private var lastWidth = 0
     private var lastHeight = 0
+    private var lastRenderedNanos = 0L
     private val info = MediaCodec.BufferInfo()
     private val pump = worker.scheduleWithFixedDelay({ tick() }, 0, 4, TimeUnit.MILLISECONDS)
 
@@ -217,11 +221,20 @@ class VideoRenderer(
             when {
                 index >= 0 -> {
                     val available = System.nanoTime()
-                    decoder.releaseOutputBuffer(index, render)
+                    // While catching up on a backlog every picture is still decoded (the
+                    // prediction chain needs it) but only the newest reaches the screen, so the
+                    // image jumps forward instead of replaying the stall. Showing one frame per
+                    // CATCH_UP_MAX_FREEZE_NS keeps it alive if the decoder itself falls behind.
+                    val show = render && (input.depth() <= CATCH_UP_DEPTH ||
+                        available - lastRenderedNanos >= CATCH_UP_MAX_FREEZE_NS)
+                    decoder.releaseOutputBuffer(index, show)
                     val releasedAt = System.nanoTime()
-                    measurements.output(info.presentationTimeUs, render, available, releasedAt)
+                    measurements.output(info.presentationTimeUs, show, available, releasedAt)
                     // This counts release-to-surface requests, not physical panel presentation.
-                    if (render) telemetry.onFrameRendered(releasedAt)
+                    if (show) {
+                        lastRenderedNanos = releasedAt
+                        telemetry.onFrameRendered(releasedAt)
+                    }
                 }
                 index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                     val format = decoder.outputFormat
@@ -242,6 +255,11 @@ class VideoRenderer(
 
     internal companion object {
         const val TAG = "Wormhole"
+        const val STEADY_MAX_FRAMES = 90
+        const val STARTUP_MAX_FRAMES = 120
+        /** Queue depth above which decoded output is dropped instead of displayed. */
+        const val CATCH_UP_DEPTH = 3
+        const val CATCH_UP_MAX_FREEZE_NS = 200_000_000L
 
         fun parseDimensions(hasKey: (String) -> Boolean, getInt: (String) -> Int): Pair<Int, Int> {
             val hasCrop = hasKey("crop-left") && hasKey("crop-right") &&
