@@ -266,7 +266,11 @@ rebuilt deps. Update `THIRD_PARTY_NOTICES.md` if versions change.
 `.gitea/workflows/`, which takes precedence there):
 
 - **Pull requests:** unit tests + debug APK, uploaded as a workflow artifact.
-- **Push to `main`:** signed release APK, republished as the rolling `latest` pre-release.
+- **Push to `main`:** automatic release: next version = newest `vX.Y.Z` tag with the patch
+  bumped (`#minor` / `#major` in the merge message bump those, `[skip release]` publishes
+  nothing). The same run creates the tag and the GitHub Release, because tags pushed with
+  `GITHUB_TOKEN` do not start another workflow run. The old rolling `latest` pre-release
+  is deleted by that step.
 - **Tag `vX.Y.Z`:** signed release APK published as a GitHub Release with
   `second-display.apk` and its `.sha256`.
 
