@@ -247,7 +247,6 @@ class VideoRenderer(
                         onVideoSizeChanged(w, h)
                     }
                 }
-                index == MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED -> Unit
                 else -> return
             }
         }
