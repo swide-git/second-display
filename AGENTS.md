@@ -7,8 +7,10 @@ hours.
 ## What this is
 
 An AirPlay-compatible **mirroring and extended display receiver** for Android,
-developed and tested on Meta Portal+ (Gen 2), Portal Go, Portal TV and
-Portal Mini (Android 9–10 / API 28–29, arm64, Wi-Fi only). A Mac, iPhone or
+for Android 11+ phones and tablets (minSdk 30, targetSdk 35, arm64, Wi-Fi
+only), tested on a Xiaomi Pad (Android 14, HyperOS). It is a fork of
+pgodlews/wormhole-display, which targeted Meta Portals (Android 9-10); Portals
+are not supported by this build. A Mac, iPhone or
 iPad sees the device in its native Screen Mirroring picker and streams video and
 lifting (RTSP, FairPlay, decryption, mDNS) is a vendored copy of UxPlay's C core
 at `app/src/main/cpp/uxplay/`; the app layer is Kotlin + MediaCodec/AudioTrack.
@@ -62,8 +64,24 @@ adb install -r dist/wormhole-display.apk
 adb shell am start -n io.github.pgodlews.wormhole/.MainActivity
 ```
 
-Portal devices are reachable over ADB via USB-C. Device and sender must share a
-Wi-Fi LAN (mDNS does not cross the USB cable; Portal has no ethernet).
+The device is reachable over ADB via USB or wireless debugging. Device and sender
+must share a Wi-Fi LAN (mDNS does not cross the USB cable).
+
+Installing on a real device:
+
+- **Never install while a session is running**: the install force-stops the app
+  and drops the sender. Check first that the newest of `mirror video started` /
+  `mirror video stopped` in `adb logcat -d -s Wormhole` is `stopped`.
+- **Play Protect** rejects debug APKs over USB (`INSTALL_FAILED_VERIFICATION_FAILURE`).
+  Switch `settings put global verifier_verify_adb_installs 0` only for the install
+  and restore it to `1` right after.
+- **versionCode**: local builds default to 1 and cannot replace a higher installed
+  version (`INSTALL_FAILED_VERSION_DOWNGRADE`). Set `WORMHOLE_VERSION_CODE` above
+  the installed value.
+- A new signature (or an uninstall) drops the *Display over other apps* grant;
+  re-grant with `adb shell appops set io.github.pgodlews.wormhole SYSTEM_ALERT_WINDOW allow`.
+- Vendor ROMs (Xiaomi, Samsung, Huawei, OnePlus) kill background apps; logcat
+  `Killing … OneKeyClean` means the user cleared Recents, not a crash.
 
 ## How a connection works (protocol flow)
 
@@ -117,11 +135,11 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
 | Crash: `assertion "raop->dnssd" failed` on first /info | `/info` reads TXT records from the C dnssd object | `dnssd_init` + `dnssd_register_*` must complete before HTTP starts (done in `nativeStart`) |
 | Picker shows the device, connect fails instantly | Advertised `pk` ≠ the server's actual ed25519 key | Always advertise `raop_get_pk_str()` output; never a random/persisted key |
 | Mac mirrors at 1920×1080, looks wrong on the panel | UxPlay defaults advertise 1920×1080@30; **macOS mirrors at whatever you advertise** | `raop_set_plist(raop,"width"/"height"/"refreshRate"/"maxFPS", …)` — done from real display metrics in `nativeStart` |
-| App not in Portal's app list | Missing launcher icon — Portal OS hides icon-less apps | Keep `android:icon="@mipmap/ic_launcher"` in the manifest |
+| App not in the launcher | Missing launcher icon: some launchers hide icon-less apps | Keep `android:icon="@mipmap/ic_launcher"` in the manifest |
 | Re-pairing a running app via `am start … --es` silently does nothing | Standard-launchMode activities don't get `onNewIntent` when already on top | `android:launchMode="singleTop"` (already set) |
 | Stream is live (decoders started) but the app stays behind the launcher | Android 10 blocks background activity starts; logcat shows `Background activity start … isBgStartWhitelisted: false` | Needs "Display over other apps" (`SYSTEM_ALERT_WINDOW` appop). The dashboard's *Auto-open on connect* row links to it. A new `applicationId` starts without the grant |
 | mDNS advertising works on desktop Java but not on device | Android drops multicast without a `WifiManager.MulticastLock`; also needs `CHANGE_WIFI_MULTICAST_STATE` | `WormholeIdentity` holds the multicast lock — it must be held while mdnsd runs |
-| Why not `NsdManager` for Bonjour? | It cannot publish TXT records before API 31; Portal is API 28–29 | Native `mdnsd` is used instead (and is required for /info anyway) |
+| Why not `NsdManager` for Bonjour? | It cannot publish TXT records before API 31; this build supports API 30 | Native `mdnsd` is used instead (and is required for /info anyway) |
 | Native link errors: `dnssd_private_init`, `dnssd_get_*_txt` undefined | Those symbols live in a dnssd *backend*; you must compile exactly one (`mdnsd/`) | `${UX}/mdnsd/*.c` is in the CMake glob |
 | Stale native builds after adding/removing .c files | CMake `file(GLOB)` result is cached | The glob uses `CONFIGURE_DEPENDS`; if it still looks stale, `rm -rf app/build/intermediates/cxx app/.cxx` then rebuild |
 | Multiple receivers on one LAN collide / connections misrouted | `gethostname()` returns "localhost" on Android | mDNS hostname is derived from `hwaddr` (vendor patch in `mdnsd/dnssd_mdnsd.c`) |
@@ -163,22 +181,47 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
   handles HEVC VPS/SPS/PPS and random access, and `VideoRenderer` selects that
   decoder. H.264 stays available. A renderer failure in an HEVC session suppresses
   HEVC advertisement until the setting is toggled or the process restarts.
-  The sender still chooses the codec: on Portal+ over Wi-Fi a Mac selected AVC at
-  2160×1440 despite bit 42, while an iPad and an iPhone negotiated HEVC. For a real
+  The sender still chooses the codec: upstream saw a Mac on Wi-Fi select AVC at
+  2160×1440 despite bit 42 (also seen on a 2000×1200 tablet), while an iPad and an iPhone negotiated HEVC. For a real
   codec A/B comparison keep resolution, content, frame-rate limit and network
   identical, and confirm `negotiated video codec` in logcat on both runs.
 - **Screen orientation & rotation**:
-  `ScreenOrientation` exposes `LANDSCAPE`, `PORTRAIT`, and `AUTO`. Hardware
-  accelerometer rotation (`AUTO`) is enabled only on hardware with rotatable
-  physical stands (Portal+ Gen 1 with swivel arm, Portal Mini 8" with dual-side feet)
-  via `WormholeIdentity.supportsAutoOrientation()`. Fixed-orientation devices
-  (Portal TV on HDMI, Portal Go with wedge stand, Portal+ Gen 2 with tilt-only stand)
-  have `AUTO` mode hidden/disabled and default to `LANDSCAPE`, though manual
-  `PORTRAIT` / `LANDSCAPE` overrides remain available on all devices. Because
-  macOS/iOS negotiate resolution at session setup and do not dynamically renegotiate
-  stream geometry mid-session, switching orientation disconnects any active mirroring
-  client (`disconnectClient("orientation_changed")`) and restarts the native receiver
-  to re-advertise transposed dimensions in RTSP `/info`.
+  `ScreenOrientation` exposes `LANDSCAPE`, `PORTRAIT`, and `AUTO`. `AUTO`
+  (accelerometer rotation) is offered when `WormholeIdentity.supportsAutoOrientation()`
+  finds an accelerometer and the device is not a TV; the Portal-specific exclusions
+  in that function are inherited from upstream and inert on this build. Manual
+  `PORTRAIT` / `LANDSCAPE` stay available everywhere. Because macOS/iOS negotiate
+  resolution at session setup and do not renegotiate geometry mid-session,
+  switching orientation disconnects any active mirroring client
+  (`disconnectClient("orientation_changed")`) and restarts the native receiver to
+  re-advertise transposed dimensions in RTSP `/info`.
+- **Preferred resolution**: `ResolutionPreset` (native, fixed 16:10 / 16:9 sizes,
+  80/64/50 %) feeds `scaledDisplayInfo()` in `WormholeServer`, which every
+  `computeDisplayInfo` call goes through. A change reuses the orientation path
+  (`applyOrientation(..., resolutionChange = true)`), so the notice reads
+  "Resolution Changed". `NATIVE` must stay exactly the panel size (no rounding);
+  fixed presets larger than the panel are filtered by `available()` and ignored by
+  `scaledDisplayInfo()` if saved on another device. Covered by `ResolutionPresetTest`.
+- **Decoder buffering**: `VideoRenderer` builds its queue with `STEADY_MAX_FRAMES`
+  (90) and `STARTUP_MAX_FRAMES` (120). Do not lower them back to 12: an overflow
+  drops the prediction chain, the receiver cannot request an IDR, and the session
+  ends 2 s later. Catch-up rendering (`CATCH_UP_DEPTH`, `CATCH_UP_MAX_FREEZE_NS`)
+  lives in `drainOutput`. Details in `docs/architecture.md`.
+- **Wi-Fi lock**: `WormholeIdentity.holdWifiLock()` / `releaseWifiLock()` sit next to
+  the multicast lock in the server lease. `adb shell cmd wifi force-low-latency-mode`
+  is not available to the shell user on Android 14, so the app lock is the only way
+  to stop the radio dozing. Verify with `adb shell dumpsys wifi | grep -i wormhole`.
+- **In-session settings**: a transparent `pointerInput` box over the `SurfaceView`
+  opens `MirrorSettingsDialog` on long press. Stats overlay and speaker apply live;
+  resolution and HEVC restart the receiver. Back inside the dialog only closes it.
+- **Platform rules (targetSdk 35)**: `startForeground` must pass
+  `FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE` (manifest type, Android 14); the
+  service start is wrapped because Android 12+ can refuse background starts;
+  `POST_NOTIFICATIONS` is requested once (Android 13); system bars are hidden with
+  `WindowInsetsController` in `onWindowFocusChanged`, the window extends into the
+  cutout and the dashboard pads `WindowInsets.displayCutout` (Android 15 edge to
+  edge). Inside `MainActivity`, refer to `android.view.WindowInsets` by its full
+  name: the Compose `WindowInsets` from `foundation.layout.*` has the same name.
 - **Package or class renames**: the JNI functions in `wormhole_jni.c`
   (`Java_io_github_pgodlews_wormhole_NativeBridge_*`) and the
   `FindClass("io/github/pgodlews/wormhole/NativeBridge$Listener")` string encode
@@ -220,10 +263,9 @@ build N commits later is `X.Y.Z-N-g<sha>` with `+N` (capped at 99), so the next 
 always upgrades it. Minor and patch must stay ≤ 99. Local builds default to
 `0.1.0-dev` / versionCode 1.
 
-Lint's `ExpiredTargetSdkVersion` (a Play Store policy check) is downgraded to a
-warning in `app/build.gradle.kts`; otherwise `lintVitalRelease` fails every release
-build. `targetSdk = 29` is intentional: Portal runs API 28–29, APKs are sideloaded,
-and raising it would bring newer background-start and foreground-service rules.
+`targetSdk` is 35, so lint's `ExpiredTargetSdkVersion` no longer needs an override.
+Local builds pass `WORMHOLE_VERSION_CODE` / `WORMHOLE_VERSION_NAME` to install over
+an existing build (see "Build, deploy, run").
 
 Release signing reads `WORMHOLE_KEYSTORE_PATH`, `WORMHOLE_KEYSTORE_PASSWORD`,
 `WORMHOLE_KEY_ALIAS` and `WORMHOLE_KEY_PASSWORD`. CI fills them from repository

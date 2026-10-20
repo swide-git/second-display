@@ -14,8 +14,8 @@ renderers with `MediaCodec` + `SurfaceView` for video and `AudioTrack` for audio
 - **Crypto** (`playfair/`, `pairing.c`, `srp.c`, `crypto.c`) — pairing handshake and
   stream decryption; uses a static OpenSSL `libcrypto` for arm64.
 - **Discovery** — UxPlay's bundled internal mDNS responder (`lib/mdnsd/`). Android's
-  `NsdManager` cannot publish TXT records before API 31 (Portal devices run API
-  28–29), and the `/info` handler asserts on the C `dnssd` object anyway, so
+  `NsdManager` cannot publish TXT records before API 31 (this build supports API
+  30), and the `/info` handler asserts on the C `dnssd` object anyway, so
   advertisement stays native.
 - **JNI shim** (`cpp/wormhole_jni.c`) — server lifecycle and core callbacks.
   Decrypted Annex-B H.264/HEVC is copied to `VideoFrameQueue` → `VideoRenderer`
@@ -50,7 +50,7 @@ flowchart LR
         PICK["Screen Mirroring picker<br/>or AirPlay audio"]
     end
 
-    subgraph Portal["Portal (Android 9 to 10)"]
+    subgraph Portal["Android device (Android 11+)"]
         subgraph Native["Native core (C)"]
             MDNS["mdnsd<br/>_airplay._tcp, _raop._tcp"]
             CORE["UxPlay core<br/>RTSP, FairPlay, decryption"]
@@ -168,7 +168,7 @@ stateDiagram-v2
 
 Mirroring and iOS audio-only send AAC-ELD (`ct` 8), which the Kotlin renderer decodes.
 Music and iTunes over legacy RAOP send ALAC (`ct` 2). The shim decodes that to PCM
-before the JNI hop, because the Portal has no ALAC `MediaCodec` decoder.
+before the JNI hop, because Android devices generally have no ALAC `MediaCodec` decoder.
 
 ```mermaid
 flowchart LR
@@ -215,9 +215,37 @@ and the `features` bitmask built by the vendored `dnssd` from `lib/dnssdint.h`
 is added when experimental HEVC is enabled). Display geometry is advertised from
 real panel metrics via `raop_set_plist` in `wormhole_jni.c` — senders stream at
 whatever size is advertised. When screen orientation changes (either via manual toggle
-or physical device rotation on supported models such as Portal Mini),
+or physical device rotation on devices with a rotation sensor),
 active mirroring clients are disconnected and the receiver restarts with transposed
 width/height values so connecting senders pick up the updated geometry in `/info`.
+
+## Video buffering on lossy Wi-Fi
+
+The receiver cannot ask the sender for a new IDR, and a Mac mirroring session sends
+them rarely. Losing compressed input therefore loses the prediction chain until the
+next IDR, and `VideoRenderer` ends the session after 2 s without one.
+
+- `VideoFrameQueue` holds up to **90** compressed frames in steady state (120 during
+  decoder start-up, 8 MB cap). After a Wi-Fi stall the sender delivers the backlog
+  in a burst; the queue absorbs it instead of overflowing. The decoder pump submits
+  one access unit per 4 ms tick, so a hardware decoder catches up quickly.
+- While more than 3 frames are queued, `drainOutput` decodes every picture (the
+  chain needs them) but releases output without rendering, except one frame per
+  200 ms, so the picture jumps to the present instead of replaying the stall.
+- `WormholeIdentity` holds a `WIFI_MODE_FULL_LOW_LATENCY` lock while the receiver
+  runs. Without it the radio dozes between packets and the sender sees round trips
+  of up to a second, which is what produces the bursts. The mode only takes effect
+  while the app is in the foreground with the screen on.
+
+## Advertised resolution
+
+`ResolutionPreset` picks the size advertised in `/info`: the native panel, a fixed
+common size (oriented like the panel, hidden if larger than it) or a percentage of
+the panel rounded down to a multiple of 8. `WormholeServer.setResolutionPreset`
+re-runs the same path as an orientation change: an active mirroring client is
+disconnected (the notice says "Resolution Changed") and the receiver restarts so
+the next connection reads the new geometry. The decoder output is scaled to the
+surface with the video's aspect ratio, so a different aspect is letterboxed.
 
 ## Licensing
 
