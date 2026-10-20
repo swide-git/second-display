@@ -76,7 +76,7 @@ Installing on a real device:
   Switch `settings put global verifier_verify_adb_installs 0` only for the install
   and restore it to `1` right after.
 - **versionCode**: local builds default to 1 and cannot replace a higher installed
-  version (`INSTALL_FAILED_VERSION_DOWNGRADE`). Set `WORMHOLE_VERSION_CODE` above
+  version (`INSTALL_FAILED_VERSION_DOWNGRADE`). Set `SECOND_DISPLAY_VERSION_CODE` above
   the installed value.
 - A new signature (or an uninstall) drops the *Display over other apps* grant;
   re-grant with `adb shell appops set io.github.swiderekartmax.seconddisplay SYSTEM_ALERT_WINDOW allow`.
@@ -277,12 +277,12 @@ always upgrades it. Minor and patch must stay ≤ 99. Local builds default to
 `0.1.0-dev` / versionCode 1.
 
 `targetSdk` is 35, so lint's `ExpiredTargetSdkVersion` no longer needs an override.
-Local builds pass `WORMHOLE_VERSION_CODE` / `WORMHOLE_VERSION_NAME` to install over
+Local builds pass `SECOND_DISPLAY_VERSION_CODE` / `SECOND_DISPLAY_VERSION_NAME` to install over
 an existing build (see "Build, deploy, run").
 
-Release signing reads `WORMHOLE_KEYSTORE_PATH`, `WORMHOLE_KEYSTORE_PASSWORD`,
-`WORMHOLE_KEY_ALIAS` and `WORMHOLE_KEY_PASSWORD`. CI fills them from repository
-secrets (`WORMHOLE_KEYSTORE_BASE64` plus the other three). Without a keystore,
+Release signing reads `SECOND_DISPLAY_KEYSTORE_PATH`, `SECOND_DISPLAY_KEYSTORE_PASSWORD`,
+`SECOND_DISPLAY_KEY_ALIAS` and `SECOND_DISPLAY_KEY_PASSWORD`. CI fills them from repository
+secrets (`SECOND_DISPLAY_KEYSTORE_BASE64` plus the other three). Without a keystore,
 `assembleRelease` produces an unsigned APK, and pushes to `main`/tags fail rather
 than publish unsigned builds. Never commit keystores (`*.jks`/`*.keystore` are
 gitignored). Release-signed and debug-signed APKs can't replace each other on a
