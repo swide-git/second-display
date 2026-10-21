@@ -66,7 +66,7 @@ so future upgrades remain diffable.
 ```bash
 ./scripts/build.sh
 adb install -r dist/second-display.apk
-adb shell am start -n io.github.swiderekartmax.seconddisplay/.MainActivity
+adb shell am start -n io.github.swidegit.seconddisplay/io.github.swiderekartmax.seconddisplay.MainActivity
 ```
 
 The device is reachable over ADB via USB or wireless debugging. Device and sender
@@ -84,7 +84,7 @@ Installing on a real device:
   version (`INSTALL_FAILED_VERSION_DOWNGRADE`). Set `SECOND_DISPLAY_VERSION_CODE` above
   the installed value.
 - A new signature (or an uninstall) drops the *Display over other apps* grant;
-  re-grant with `adb shell appops set io.github.swiderekartmax.seconddisplay SYSTEM_ALERT_WINDOW allow`.
+  re-grant with `adb shell appops set io.github.swidegit.seconddisplay SYSTEM_ALERT_WINDOW allow`.
 - Vendor ROMs (Xiaomi, Samsung, Huawei, OnePlus) kill background apps; logcat
   `Killing … OneKeyClean` means the user cleared Recents, not a crash.
 
@@ -296,10 +296,14 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
   cutout and the dashboard pads `WindowInsets.displayCutout` (Android 15 edge to
   edge). Inside `MainActivity`, refer to `android.view.WindowInsets` by its full
   name: the Compose `WindowInsets` from `foundation.layout.*` has the same name.
-- **Application ID and package**: both are `io.github.swiderekartmax.seconddisplay`
-  (`applicationId`, `namespace`, Kotlin package). The JNI function names in
+- **Application ID and package**: `applicationId` is `io.github.swidegit.seconddisplay`
+  (the GitHub account is `swide-git`; the old ID is taken on Google Play by a managed
+  Play private build, and Play never frees package names). `namespace` and the Kotlin
+  package stay `io.github.swiderekartmax.seconddisplay`: the JNI function names in
   `wormhole_jni.c` (`Java_io_github_swiderekartmax_seconddisplay_NativeBridge_*`) and the
-  `FindClass` string encode that package; see "Package or class renames". The
+  `FindClass` string encode the Kotlin package, not the application ID; see "Package or
+  class renames". Because the two differ, `am start` needs the full class name
+  (`<applicationId>/io.github.swiderekartmax.seconddisplay.MainActivity`). The
   user-facing name *Second Display* lives in `app_name`, the dashboard title,
   `WormholeIdentity.DEFAULT_SERVICE_NAME` and the service notification texts.
 - **Launcher icon**: adaptive icon in `mipmap-anydpi-v26/ic_launcher.xml` (vector
@@ -344,6 +348,9 @@ rebuilt deps. Update `THIRD_PARTY_NOTICES.md` if versions change.
   is deleted by that step.
 - **Tag `vX.Y.Z`:** signed release APK published as a GitHub Release with
   `second-display.apk` and its `.sha256`.
+- Every published release (automatic or tagged) also carries `second-display.aab`,
+  the signed App Bundle for Google Play (Play takes bundles, not APKs, for new
+  apps), plus its `.sha256`. Play App Signing uses the release key as the upload key.
 
 Versions come from `scripts/version.sh` (newest reachable `vX.Y.Z` tag): a tagged
 commit builds as `X.Y.Z` with versionCode `X*1000000 + Y*10000 + Z*100`; a `main`

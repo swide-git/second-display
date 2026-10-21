@@ -12,7 +12,7 @@ import time
 import uuid
 
 REPO = Path(__file__).resolve().parent.parent
-PACKAGE = "io.github.swiderekartmax.seconddisplay"
+PACKAGE = "io.github.swidegit.seconddisplay"
 
 
 def main():
@@ -101,7 +101,7 @@ data_sources { config { name: "linux.ftrace" ftrace_config {
   atrace_categories: "gfx"
   atrace_categories: "view"
   atrace_categories: "video"
-  atrace_apps: "io.github.swiderekartmax.seconddisplay"
+  atrace_apps: "io.github.swidegit.seconddisplay"
 } } }
 ''' + f"duration_ms: {args.trace_seconds * 1000}\n"
             (output / "trace-config.pbtxt").write_text(config)

@@ -32,7 +32,9 @@ android {
         }
     }
     defaultConfig {
-        applicationId = "io.github.swiderekartmax.seconddisplay"
+        // Differs from namespace: the original ID is taken on Google Play (account renamed to swide-git). JNI names follow the
+        // Kotlin package (namespace), not this value.
+        applicationId = "io.github.swidegit.seconddisplay"
         // Android 11+ phones and tablets. Portals (Android 9-10) are not supported by this build.
         minSdk = 30
         targetSdk = 35
