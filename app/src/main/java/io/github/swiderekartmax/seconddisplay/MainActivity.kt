@@ -25,6 +25,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
@@ -37,6 +38,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.pointer.pointerInput
@@ -45,13 +47,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -218,11 +224,30 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     if (mirroring) {
                         BackHandler { WormholeServer.disconnectClient("back") }
-                        Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-                            val surfaceModifier = if (videoAspectRatio != null && videoAspectRatio!! > 0f) {
-                                Modifier.aspectRatio(videoAspectRatio!!)
-                            } else {
-                                Modifier.fillMaxSize()
+                        // Pinch zoom is local only; a new picture geometry starts unzoomed.
+                        var zoom by remember(videoAspectRatio) { mutableStateOf(PinchZoom()) }
+                        var containerSize by remember { mutableStateOf(IntSize.Zero) }
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .background(Color.Black)
+                                .clipToBounds()
+                                .onSizeChanged { containerSize = it },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // The SurfaceView is laid out at the zoomed size rather than scaled with
+                            // graphicsLayer: a SurfaceView's surface does not follow Compose layer transforms.
+                            val surfaceModifier = Modifier.layout { measurable, constraints ->
+                                val (baseW, baseH) = PinchZoom.fit(videoAspectRatio, constraints.maxWidth, constraints.maxHeight)
+                                val w = (baseW * zoom.scale).toInt()
+                                val h = (baseH * zoom.scale).toInt()
+                                val placeable = measurable.measure(Constraints.fixed(w, h))
+                                layout(baseW, baseH) {
+                                    placeable.place(
+                                        (baseW - w) / 2 + zoom.offsetX.toInt(),
+                                        (baseH - h) / 2 + zoom.offsetY.toInt()
+                                    )
+                                }
                             }
                             AndroidView(
                                 factory = { context ->
@@ -249,11 +274,31 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                             // Long press opens settings without leaving the mirror; Back still disconnects.
+                            // Two fingers zoom, one finger pans a zoomed picture, double tap resets.
                             Box(
                                 Modifier
                                     .matchParentSize()
                                     .pointerInput(Unit) {
-                                        detectTapGestures(onLongPress = { showMirrorSettings = true })
+                                        detectTapGestures(
+                                            onLongPress = { showMirrorSettings = true },
+                                            onDoubleTap = { zoom = PinchZoom() }
+                                        )
+                                    }
+                                    .pointerInput(videoAspectRatio) {
+                                        detectTransformGestures { centroid, pan, gestureZoom, _ ->
+                                            val (baseW, baseH) = PinchZoom.fit(videoAspectRatio, containerSize.width, containerSize.height)
+                                            zoom = zoom.transform(
+                                                centroidX = centroid.x - containerSize.width / 2f,
+                                                centroidY = centroid.y - containerSize.height / 2f,
+                                                panX = pan.x,
+                                                panY = pan.y,
+                                                zoom = gestureZoom,
+                                                contentWidth = baseW.toFloat(),
+                                                contentHeight = baseH.toFloat(),
+                                                containerWidth = containerSize.width.toFloat(),
+                                                containerHeight = containerSize.height.toFloat()
+                                            )
+                                        }
                                     }
                             )
                         }
