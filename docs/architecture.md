@@ -1,8 +1,9 @@
 # Second Display: architecture
 
-Goal: an Android device appears in the macOS/iOS **Screen Mirroring** picker and
-accepts a native mirroring or extended-display session, with audio, and no
-companion app on the sender.
+Goal: an Android device appears in the macOS/iOS **Screen Mirroring** picker, the
+Windows 10/11 **Cast (`Win + K`)** picker, and Linux **GNOME Network Displays**,
+and accepts a native mirroring or extended-display session, with audio, and no
+companion app on macOS/iOS/Windows.
 
 ## Approach
 
@@ -13,10 +14,21 @@ renderers with `MediaCodec` + `SurfaceView` for video and `AudioTrack` for audio
 - **Protocol core** (`raop*.c`, `httpd.c`, `llhttp/`) — RTSP/HTTP control channel.
 - **Crypto** (`playfair/`, `pairing.c`, `srp.c`, `crypto.c`) — pairing handshake and
   stream decryption; uses a static OpenSSL `libcrypto` for arm64.
-- **Discovery** — UxPlay's bundled internal mDNS responder (`lib/mdnsd/`). Android's
-  `NsdManager` cannot publish TXT records before API 31 (this build supports API
-  30), and the `/info` handler asserts on the C `dnssd` object anyway, so
-  advertisement stays native.
+- **Discovery** — UxPlay's bundled internal mDNS responder (`lib/mdnsd/`) advertises
+  `_airplay._tcp` (port 7000), `_raop._tcp` (port 7000), and `_display._tcp` (port
+  7250, for MS-MICE / Miracast over Infrastructure with `container_id` and `p2pMAC`
+  TXT records). Android's `NsdManager` cannot publish TXT records before API 31 (this
+  build supports API 30), and the `/info` handler asserts on the C `dnssd` object
+  anyway, so advertisement stays native.
+- **Miracast over Infrastructure (`MiracastReceiver.kt` + `MpegTsDemuxer.kt`)** —
+  TCP port 7250 accepts MS-MICE binary packets (`SOURCE_READY = 0x01`,
+  `STOP_PROJECTION = 0x02`, TLV `FRIENDLY_NAME`, `RTSP_PORT`, `SOURCE_ID`) or a
+  direct RTSP connection, connects back to the sender's RTSP server, and completes
+  the Wi-Fi Display `M1`–`M16` handshake (`OPTIONS`, `GET_PARAMETER`,
+  `SET_PARAMETER`, `SETUP`, `PLAY`, `TEARDOWN`, `wfd_idr_request`). The UDP RTP
+  receiver (`MpegTsDemuxer`) parses MPEG-2 Transport Stream PAT/PMT tables and
+  reassembles Annex-B H.264/HEVC video PES and 48 kHz LPCM/AAC-LC audio PES into
+  the shared `VideoRenderer` and `AudioRenderer`.
 - **JNI shim** (`cpp/wormhole_jni.c`) — server lifecycle and core callbacks.
   Decrypted Annex-B H.264/HEVC is copied to `VideoFrameQueue` → `VideoRenderer`
   (hardware `MediaCodec` on a `Surface`); decrypted AAC-ELD is copied to
