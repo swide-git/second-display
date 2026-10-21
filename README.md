@@ -52,6 +52,8 @@ Second Display is an independent community project and is not affiliated with Ap
 
 Tested on a Xiaomi Pad (Android 14, HyperOS, 2000×1200) with a MacBook as the sender. Android 15 and 16 are supported by the code but not yet tested on a device; reports are welcome.
 
+**Windows and Linux (Miracast) are new and not yet tested on a device.** Windows finds Miracast receivers over Wi-Fi Direct before it uses the local network, and an ordinary Android app cannot advertise itself that way, so `Win + K` may not list the device at all. GNOME Network Displays on Linux browses the local network directly and is the more likely sender to work. Reports either way are welcome.
+
 ---
 
 ## Installation
@@ -100,6 +102,8 @@ For crisp text, see the [text sharpness guide](docs/macos-text-sharpness.md).
 **Control Center → Screen Mirroring**, pick the device.
 
 ### From Windows 10 or 11
+
+Untested, and discovery may not work; see [Requirements](#requirements).
 
 1. Windows PC and Android device on the same Wi-Fi network (set the Windows Wi-Fi network profile to **Private** so mDNS/TCP 7250 is allowed by Windows Firewall).
 2. Press **`Win + K`** to open the Cast / Wireless Display menu and select **Second Display**.
@@ -208,7 +212,7 @@ See [the architecture notes](docs/architecture.md) for details.
 
 ## Privacy and security
 
-- The app only communicates with the device that connects to it on the local network: no analytics, crash reporting, ads or external servers. Its only libraries are Jetpack Compose (UI), OpenSSL and libplist (AirPlay protocol).
+- Apart from the device that connects to it on the local network, the app makes one request: the dashboard asks `api.github.com` for the latest release number to show next to the installed version. No analytics, crash reporting, ads or other external servers. Its only libraries are Jetpack Compose (UI), OpenSSL and libplist (AirPlay protocol).
 - It accepts screen-mirroring connections from **any device on your local network, without a PIN or password**. Use it only on networks you trust.
 
 ---

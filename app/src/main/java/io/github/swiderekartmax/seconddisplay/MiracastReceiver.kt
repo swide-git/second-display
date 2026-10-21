@@ -361,13 +361,7 @@ class MiracastReceiver(
                             )
                         }
                         "TEARDOWN" -> {
-                            sendClientRequest(
-                                method = "TEARDOWN",
-                                uri = presentationUrl,
-                                extraHeaders = buildMap {
-                                    sessionId?.let { put("Session", it) }
-                                }
-                            )
+                            // close() sends the TEARDOWN request when a session is established
                             close(notifyStop = true)
                         }
                     }
@@ -696,7 +690,9 @@ class MiracastReceiver(
                 .toSet()
 
             val videoFormats = buildWfdVideoFormats(display)
-            val audioCodecs = "LPCM 00000003 00, AAC 00000001 00"
+            // LPCM mode bit 1 only (48 kHz stereo): the demuxer and AudioRenderer assume 48 kHz,
+            // so 44.1 kHz LPCM (bit 0) must not be offered.
+            val audioCodecs = "LPCM 00000002 00, AAC 00000001 00"
             val rtpPorts = "RTP/AVP/UDP;unicast $localRtpPort 0 mode=play"
 
             val knownReplies = linkedMapOf(
@@ -733,22 +729,20 @@ class MiracastReceiver(
          * Advertises both H.264 Constrained Baseline Profile (01) and High Profile (02) up to Level 4.2 (1f).
          */
         fun buildWfdVideoFormats(display: DisplayInfo): String {
-            val maxPixels = maxOf(display.width * display.height, 1920 * 1080)
-            // CEA resolutions: bits 0..8 cover up to 1920x1080p60 (0x0001ffff); bits 17..21 cover 3840x2160
-            val ceaMask = if (maxPixels >= 3840 * 2160) 0x003fffff else 0x0001ffff
-            // VESA resolutions: bits 0..28 cover up to 1920x1200 (0x1fffffff); bits 29..32 cover 2560x1440 / 2560x1600
-            val vesaMask = if (maxPixels >= 2560 * 1440) 0x7fffffff else 0x1fffffff
+            // WFD 1.0 defines CEA bits 0..16 (up to 1920x1080p24) and VESA bits 0..29 (up to
+            // 1920x1200p60); higher bits are reserved, so nothing above 1920x1200 is offered.
+            val ceaMask = 0x0001ffff
+            val vesaMask = 0x3fffffff
             val hhMask = 0x00000fff
 
-            // Native resolution byte: (index << 3) | table (0 = CEA, 2 = VESA)
+            // Native resolution byte: (index << 3) | table (0 = CEA, 1 = VESA, 2 = HH)
+            // CEA index 6 = 1280x720p60 -> (6 << 3) | 0 = 0x30
             // CEA index 8 = 1920x1080p60 -> (8 << 3) | 0 = 0x40
-            // VESA index 28 = 1920x1200p30 -> (28 << 3) | 2 = 0xE2
-            // VESA index 30 = 2560x1440p60 -> (30 << 3) | 2 = 0xF2
+            // VESA index 29 = 1920x1200p60 -> (29 << 3) | 1 = 0xE9
             val nativeByte = when {
-                display.width >= 2560 && display.height >= 1440 -> 0xF2
-                display.width == 1920 && display.height == 1200 -> 0xE2
-                display.width <= 1280 && display.height <= 720 -> 0x30 // CEA index 6 = 1280x720p60
-                else -> 0x40 // CEA index 8 = 1920x1080p60
+                display.width == 1920 && display.height == 1200 -> 0xE9
+                display.width <= 1280 && display.height <= 720 -> 0x30
+                else -> 0x40
             }
 
             val ceaHex = String.format("%08x", ceaMask)

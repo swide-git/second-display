@@ -64,10 +64,23 @@ class MiracastReceiverTest {
 
         val resp = MiracastReceiver.buildM3ParametersResponse(m3Req, display, 19000)
         assertTrue(resp.contains("wfd_client_rtp_ports: RTP/AVP/UDP;unicast 19000 0 mode=play\r\n"))
-        assertTrue(resp.contains("wfd_audio_codecs: LPCM 00000003 00, AAC 00000001 00\r\n"))
-        assertTrue(resp.contains("wfd_video_formats: e2 00 01 1f 0001ffff 1fffffff 00000fff"))
+        assertTrue(resp.contains("wfd_audio_codecs: LPCM 00000002 00, AAC 00000001 00\r\n"))
+        // Native byte: VESA table (1), index 29 = 1920x1200p60 -> (29 << 3) | 1 = 0xE9
+        assertTrue(resp.contains("wfd_video_formats: e9 00 01 1f 0001ffff 3fffffff 00000fff"))
         assertTrue(resp.contains("wfd_content_protection: none\r\n"))
         assertTrue(resp.contains("wfd_uibc_capability: none\r\n"))
+    }
+
+    @Test
+    fun `native WFD resolution uses only defined CEA and VESA entries`() {
+        fun nativeByte(w: Int, h: Int) =
+            MiracastReceiver.buildWfdVideoFormats(DisplayInfo(w, h, 60, "", "")).substringBefore(' ')
+        assertEquals("40", nativeByte(1920, 1080))
+        assertEquals("30", nativeByte(1280, 720))
+        assertEquals("e9", nativeByte(1920, 1200))
+        // Larger panels fall back to 1080p60: WFD 1.0 has no table entry above 1920x1200
+        assertEquals("40", nativeByte(2560, 1600))
+        assertTrue(MiracastReceiver.buildWfdVideoFormats(DisplayInfo(3840, 2160, 60, "", "")).contains(" 0001ffff 3fffffff "))
     }
 
     @Test

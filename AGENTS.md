@@ -12,8 +12,11 @@ only), tested on a Xiaomi Pad (Android 14, HyperOS). Second Display is a fork of
 Wormhole Display (pgodlews/wormhole-display), which targeted Meta Portals (Android 9-10); Portals
 are not supported by this build. A Mac, iPhone or
 iPad sees the device in its native Screen Mirroring picker and streams video and
-lifting (RTSP, FairPlay, decryption, mDNS) is a vendored copy of UxPlay's C core
-at `app/src/main/cpp/uxplay/`; the app layer is Kotlin + MediaCodec/AudioTrack.
+audio to it. The AirPlay heavy lifting (RTSP, FairPlay, decryption, mDNS) is a
+vendored copy of UxPlay's C core at `app/src/main/cpp/uxplay/`; the app layer is
+Kotlin + MediaCodec/AudioTrack. A second, independent receiver path in Kotlin
+speaks Miracast over Infrastructure (MS-MICE) for Linux and Windows senders; see
+"Miracast over Infrastructure" below.
 
 ## Repo layout
 
@@ -103,6 +106,60 @@ Installing on a real device:
 6. Audio (AAC-ELD, 44.1 kHz stereo) is decrypted by the core and delivered to
    `audio_process`; the shim copies each frame to `AudioRenderer`.
 
+## Miracast over Infrastructure (MS-MICE)
+
+Pure Kotlin, no UxPlay involvement except the mDNS record. It shares the renderers
+and UI state with AirPlay through `WormholeServer`, and starts and stops together
+with the native server.
+
+1. The vendored `mdnsd` also advertises `<name>._display._tcp.local` on TCP 7250
+   with TXT `container_id` (GUID derived from the MAC) and `p2pMAC`
+   (`dnssd_build_display_txt` in `mdnsd/dnssd_mdnsd.c`, listed in
+   `docs/uxplay-patches.md`).
+2. The sender opens TCP 7250 and sends MS-MICE `SOURCE_READY` (0x01) with TLVs
+   `FRIENDLY_NAME` (UTF-16LE), `RTSP_PORT` (default 7236) and `SOURCE_ID`.
+   `STOP_PROJECTION` (0x02) ends the session. The optional messages (DTLS
+   `SECURITY_HANDSHAKE`, `SESSION_REQUEST`, PIN) are not implemented, so senders
+   that require stream encryption or a PIN cannot connect.
+3. **The receiver is the RTSP client**: it connects back to `<sender>:<rtsp_port>`
+   and answers the source's Wi-Fi Display requests (M1 `OPTIONS`, M3
+   `GET_PARAMETER` capabilities, M4 `SET_PARAMETER`, M5 trigger, M16 keep-alive),
+   sending its own M2 `OPTIONS`, M6 `SETUP`, M7 `PLAY` and an M13
+   `wfd_idr_request` after `PLAY`.
+4. The stream arrives as RTP/MPEG-2 TS over UDP (preferred port 19000, fallbacks
+   19002, 19004, any). `MpegTsDemuxer` parses PAT/PMT, reassembles PES, and emits
+   Annex-B H.264/HEVC and 48 kHz LPCM (stream type 0x83, big-endian, 4-byte WFD
+   header) or AAC-LC ADTS. Audio uses the Kotlin-only content types
+   `CT_WFD_LPCM_48K` (16) and `CT_WFD_AAC_48K` (17); `AudioRenderer` rebuilds the
+   `AudioTrack` at 48 kHz for them.
+
+Rules for this path:
+
+- **Advertise only what the pipeline decodes.** M3 offers LPCM mode bit 1 only
+  (48 kHz); bit 0 (44.1 kHz) would be played at the wrong rate. `wfd_video_formats`
+  uses WFD 1.0 tables only (CEA bits 0..16, VESA bits 0..29). The native byte is
+  `(index << 3) | table` with table 0 = CEA, **1 = VESA**, 2 = HH; nothing above
+  1920×1200 exists in WFD 1.0, so larger panels advertise 1080p60 as native.
+- **Windows discovers receivers over Wi-Fi Direct first.** Per Microsoft's
+  MS-MICE guidance, every Wi-Fi Direct beacon and probe response must carry the
+  MS-MICE vendor extension (host name and capability attributes); mDNS and TCP
+  7250 are only used after the user picks a receiver found that way. An ordinary
+  Android app cannot emit those IEs (`WifiP2pManager.setWfdInfo` is a system API),
+  so `Win + K` is not expected to list the device. Treat Windows support as
+  unverified until someone sees it work, and do not claim otherwise.
+- **Linux (GNOME Network Displays)** browses `_display._tcp` over mDNS and is the
+  realistic target for this path. Not yet tested on a device either.
+- The RTSP socket has a 60 s read timeout; the source's M16 keep-alives must
+  arrive within it or the session ends.
+
+Verify the advertisement from a Linux or macOS host:
+
+```bash
+dns-sd -B _display._tcp local.        # macOS; on Linux: avahi-browse -r _display._tcp
+nc -vz <device-ip> 7250               # MS-MICE listener
+adb logcat -s WormholeMiracast        # MS-MICE packets, RTSP M1..M16, RTP errors
+```
+
 ## Verification recipes
 
 Device seen by the sender (run on the Mac):
@@ -157,7 +214,13 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
   compatibility, these strings/bitmasks are the knobs — compare against current
   UxPlay upstream. They are protocol values: never rebrand them.
 - **Ports**: RTSP 7000, mirror data TCP 7100, UDP 7011/7001/7101 — set in
-  `nativeStart`. The mDNS registration must match.
+  `nativeStart`. The mDNS registration must match. Miracast: TCP 7250
+  (`MiracastReceiver.MICE_PORT`, also `MICE_DISPLAY_PORT` in `dnssd_mdnsd.c`; keep
+  both equal) and RTP UDP 19000.
+- **Version indicator**: `MainActivity` shows `versionName` in the header and in
+  *Network & Diagnostics*, and fetches `releases/latest` from `api.github.com` once
+  per dashboard composition. This is the app's only request outside the LAN; keep
+  README "Privacy and security" in sync if that changes.
 - **Audio**: `cb_audio_process` in `wormhole_jni.c` delivers decrypted audio to
   `AudioRenderer`. Mirroring and iOS audio-only are AAC-ELD (`ct=8`, spf 480);
   legacy RAOP audio (iTunes / older macOS / some Android senders, via `ANNOUNCE`)
@@ -296,7 +359,8 @@ device: uninstall first when switching (this resets the receiver identity and th
 
 ## Hard limitations (don't promise otherwise)
 
-- Wi-Fi only, same LAN, no AWDL/p2p.
+- Wi-Fi only, same LAN, no AWDL/p2p. Without Wi-Fi Direct there is no Windows
+  `Win + K` discovery (see "Miracast over Infrastructure").
 - The sender decides mirroring vs extended display, resolution within the
   advertised modes, and codec; the receiver advertises capabilities and renders
   what it is sent.
