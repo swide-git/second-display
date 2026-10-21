@@ -53,7 +53,7 @@ jobs:
         run: |
           sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           yes | "$sdkmanager" --licenses > /dev/null || true
-          "$sdkmanager" --install "platforms;android-35" "ndk;$NDK_VERSION" "cmake;3.22.1" > /dev/null
+          "$sdkmanager" --install "platforms;android-36" "ndk;$NDK_VERSION" "cmake;3.22.1" > /dev/null
 
       - name: Compute version
         run: |

@@ -46,7 +46,7 @@ Second Display is an independent community project and is not affiliated with Ap
 
 | | |
 |---|---|
-| **Android** | 11 or newer (API 30+); built for Android 15 (targetSdk 35) |
+| **Android** | 11 or newer (API 30+); built for Android 16 (targetSdk 36) |
 | **CPU** | 64-bit ARM (`arm64-v8a`), i.e. practically every phone and tablet from recent years |
 | **Network** | Device and sender on the **same Wi-Fi network** (5 GHz strongly recommended) |
 | **Sender** | Mac, iPhone or iPad (Screen Mirroring), Windows 10/11 (`Win + K`), or Linux (GNOME Network Displays) |
@@ -162,7 +162,7 @@ brew install openjdk@17
 brew install --cask android-commandlinetools android-platform-tools
 export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
 export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
-sdkmanager --sdk_root=$ANDROID_HOME "platforms;android-35" "build-tools;35.0.0" "ndk;27.3.13750724" "cmake;3.22.1"
+sdkmanager --sdk_root=$ANDROID_HOME "platforms;android-36" "build-tools;35.0.0" "ndk;27.3.13750724" "cmake;3.22.1"
 ```
 
 Build, test and install:
@@ -225,7 +225,7 @@ Compared with [upstream Wormhole Display](https://github.com/pgodlews/wormhole-d
 - **New name and identity**: *Second Display*, application ID `io.github.swidegit.seconddisplay` (installs alongside the original, not over it), new icon.
 
 - **Android 11+ launch crash fixed**: the display was read from the application context, which throws on API 30+.
-- **Targets current Android** (minSdk 30, targetSdk 35): notification permission (Android 13), foreground-service type (Android 14), edge-to-edge with hidden system bars (Android 15). Portals (Android 9-10) are no longer supported.
+- **Targets current Android** (minSdk 30, targetSdk 36): notification permission (Android 13), foreground-service type (Android 14), edge-to-edge with hidden system bars (Android 15), orientation lock kept on tablets (Android 16). Portals (Android 9-10) are no longer supported.
 - **Stable on lossy Wi-Fi**: 90-frame decoder buffer (was 12) with catch-up that shows only the newest frame, and a low-latency Wi-Fi lock.
 - **Windows & Linux support (Miracast over Infrastructure / MS-MICE)**: advertises `_display._tcp.local` (port 7250), handles MS-MICE + Wi-Fi Display RTSP `M1`–`M16` negotiation, and demuxes RTP/MPEG-2 TS video (H.264/HEVC) and 48 kHz LPCM/AAC audio into the shared hardware renderers.
 - **Preferred resolution** setting, **version indicator** with GitHub release check, and **in-session settings** on long press.

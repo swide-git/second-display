@@ -7,7 +7,7 @@ hours.
 ## What this is
 
 An AirPlay-compatible **mirroring and extended display receiver** for Android,
-for Android 11+ phones and tablets (minSdk 30, targetSdk 35, arm64, Wi-Fi
+for Android 11+ phones and tablets (minSdk 30, targetSdk 36, arm64, Wi-Fi
 only), tested on a Xiaomi Pad (Android 14, HyperOS). Second Display is a fork of
 Wormhole Display (pgodlews/wormhole-display), which targeted Meta Portals (Android 9-10); Portals
 are not supported by this build. A Mac, iPhone or
@@ -288,7 +288,7 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
   surface is a separate layer and does not follow Compose layer transforms. The
   codec keeps its own buffer size, so a large view does not allocate large buffers.
   Zoom resets when the picture aspect changes and is never sent to the sender.
-- **Platform rules (targetSdk 35)**: `startForeground` must pass
+- **Platform rules (targetSdk 36)**: `startForeground` must pass
   `FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE` (manifest type, Android 14); the
   service start is wrapped because Android 12+ can refuse background starts;
   `POST_NOTIFICATIONS` is requested once (Android 13); system bars are hidden with
@@ -296,6 +296,12 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
   cutout and the dashboard pads `WindowInsets.displayCutout` (Android 15 edge to
   edge). Inside `MainActivity`, refer to `android.view.WindowInsets` by its full
   name: the Compose `WindowInsets` from `foundation.layout.*` has the same name.
+  Android 16 ignores `requestedOrientation` on screens of 600dp and wider; the
+  manifest sets `PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY` so the orientation
+  setting still works on tablets. That opt-out ends with targetSdk 37, which will need
+  another answer (e.g. rotating the dashboard ourselves). Back is handled only
+  through `BackHandler` (predictive back: `onBackPressed` and `KEYCODE_BACK` are
+  not delivered).
 - **Application ID and package**: `applicationId` is `io.github.swidegit.seconddisplay`
   (the GitHub account is `swide-git`; the old ID is taken on Google Play by a managed
   Play private build, and Play never frees package names). `namespace` and the Kotlin
@@ -358,7 +364,7 @@ build N commits later is `X.Y.Z-N-g<sha>` with `+N` (capped at 99), so the next 
 always upgrades it. Minor and patch must stay ≤ 99. Local builds default to
 `0.1.0-dev` / versionCode 1.
 
-`targetSdk` is 35, so lint's `ExpiredTargetSdkVersion` no longer needs an override.
+`targetSdk` is 36 (Google Play minimum for new apps and updates), so lint's `ExpiredTargetSdkVersion` no longer needs an override.
 Local builds pass `SECOND_DISPLAY_VERSION_CODE` / `SECOND_DISPLAY_VERSION_NAME` to install over
 an existing build (see "Build, deploy, run").
 

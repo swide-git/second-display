@@ -162,7 +162,7 @@ class MainActivity : ComponentActivity() {
         setShowWhenLocked(true)
         setTurnScreenOn(true)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        // Android 15 draws edge to edge for targetSdk 35; keep the bars hidden (swipe shows them
+        // Android 15+ draws edge to edge (targetSdk 35+); keep the bars hidden (swipe shows them
         // transiently) and let the mirror use the cutout area too.
         enableEdgeToEdge()
         window.attributes = window.attributes.apply {
