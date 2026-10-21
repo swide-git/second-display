@@ -32,7 +32,9 @@ app/src/main/java/io/github/swiderekartmax/seconddisplay/
     NativeBridge.kt                       JNI declarations
     ScreenOrientation.kt                  portrait/landscape/auto orientation modes and model helpers
     VideoFrameQueue.kt, VideoRenderer.kt  compressed-frame queue → MediaCodec → Surface (H.264/HEVC)
-    AudioRenderer.kt                      AAC-ELD decode → AudioTrack
+    AudioRenderer.kt                      AAC-ELD / AAC-LC / PCM decode → AudioTrack (44.1 / 48 kHz)
+    MiracastReceiver.kt                   MS-MICE (TCP 7250) + Wi-Fi Display RTSP M1-M16 client & UDP RTP loop
+    MpegTsDemuxer.kt                      RTP + MPEG-2 Transport Stream PAT/PMT/PES demuxer (H.264/HEVC, LPCM, AAC)
     NowPlaying.kt                         track metadata + extrapolated position for audio-only sessions
     WormholeIdentity.kt                   persisted deviceid, service name, Wi-Fi multicast lock
 scripts/build.sh                          build APK → dist/second-display.apk

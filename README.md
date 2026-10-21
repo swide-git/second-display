@@ -1,8 +1,8 @@
 <div align="center">
   <img src="docs/images/second_display_icon.svg" width="160" alt="Second Display icon" />
   <h1>Second Display</h1>
-  <p><strong>Turn an Android tablet or phone into a wireless display and speaker for your Mac, iPhone and iPad.</strong></p>
-  <p>AirPlay-compatible screen mirroring &amp; extended display receiver for Android 11+.</p>
+  <p><strong>Turn an Android tablet or phone into a wireless display and speaker for your Mac, iPhone, iPad, Windows PC, and Linux desktop.</strong></p>
+  <p>AirPlay &amp; Miracast over Infrastructure (MS-MICE) screen mirroring and extended display receiver for Android 11+.</p>
   <p><a href="https://github.com/swiderekart-max/second-display/releases/latest"><strong>⬇ Download the latest release (APK)</strong></a> · <a href="https://github.com/swiderekart-max/second-display/releases">All releases</a></p>
 </div>
 
@@ -10,9 +10,14 @@
 
 ## What it is
 
-Second Display makes an Android device show up in **Control Center → Screen Mirroring** on a Mac, iPhone or iPad. The Mac can use it as an **extended display** or a **mirror**, with sound. Nothing needs to be installed on the sender.
+Second Display makes an Android device show up in:
+- **macOS / iOS / iPadOS**: **Control Center → Screen Mirroring** (via AirPlay)
+- **Windows 10 / 11**: **`Win + K` (Cast / Wireless Display)** (via Miracast over Infrastructure / MS-MICE)
+- **Linux**: **GNOME Network Displays** (via `_display._tcp.local` / MS-MICE)
 
-It is an ordinary app: **no root, no cloud, no account**. It only talks to Apple devices on your local Wi-Fi.
+Your computer can use the Android device as an **extended display** or a **mirror**, with sound. Nothing needs to be installed on Mac, iPhone, iPad, or Windows.
+
+It is an ordinary app: **no root, no cloud, no account**. It only talks to devices on your local Wi-Fi.
 
 Second Display is a fork of [Wormhole Display](https://github.com/pgodlews/wormhole-display) by Piotr Godlewski, which was built for Meta Portal devices (Android 9-10). This fork targets current Android phones and tablets instead; Portals are not supported by this build. See [What this fork changes](#what-this-fork-changes).
 
@@ -22,8 +27,8 @@ Second Display is an independent community project and is not affiliated with Ap
 
 ## Features
 
-- **Shows up like any AirPlay display**, under a name you choose.
-- **Extended display or mirror**: macOS can use the device as a second screen.
+- **Shows up natively on Apple, Windows, and Linux**, under a name you choose (advertising both `_airplay._tcp` on port 7000 and `_display._tcp` on port 7250).
+- **Extended display or mirror**: macOS, Windows 10/11, and Linux can use the device as a second screen or mirror.
 - **Preferred resolution**: offer the sender the native panel size, a common size (1920×1200, 1920×1080, 1680×1050, 1600×900, 1440×900, 1280×720) or 80 / 64 / 50 % of the panel. Lower sizes are lighter on Wi-Fi. Sizes larger than the panel are hidden; sizes with a different aspect are letterboxed, never stretched.
 - **Settings during a session**: long press on the mirrored picture. Stream stats and speaker output apply at once; resolution and HEVC end the session, because the sender only reads them when it connects.
 - **Survives Wi-Fi hiccups**: a low-latency Wi-Fi lock keeps the radio awake, and a 90-frame decoder buffer absorbs the burst a sender delivers after a stall, catching up without replaying it.
@@ -43,7 +48,7 @@ Second Display is an independent community project and is not affiliated with Ap
 | **Android** | 11 or newer (API 30+); built for Android 15 (targetSdk 35) |
 | **CPU** | 64-bit ARM (`arm64-v8a`), i.e. practically every phone and tablet from recent years |
 | **Network** | Device and sender on the **same Wi-Fi network** (5 GHz strongly recommended) |
-| **Sender** | Mac, iPhone or iPad with Screen Mirroring |
+| **Sender** | Mac, iPhone or iPad (Screen Mirroring), Windows 10/11 (`Win + K`), or Linux (GNOME Network Displays) |
 
 Tested on a Xiaomi Pad (Android 14, HyperOS, 2000×1200) with a MacBook as the sender. Android 15 and 16 are supported by the code but not yet tested on a device; reports are welcome.
 
@@ -93,6 +98,17 @@ For crisp text, see the [text sharpness guide](docs/macos-text-sharpness.md).
 ### From an iPhone or iPad
 
 **Control Center → Screen Mirroring**, pick the device.
+
+### From Windows 10 or 11
+
+1. Windows PC and Android device on the same Wi-Fi network (set the Windows Wi-Fi network profile to **Private** so mDNS/TCP 7250 is allowed by Windows Firewall).
+2. Press **`Win + K`** to open the Cast / Wireless Display menu and select **Second Display**.
+3. Choose **Extend** or **Duplicate** in the Windows projection bar (`Win + P`).
+
+### From Linux
+
+1. Install and open **GNOME Network Displays**.
+2. Select **Second Display** (discovered over `_display._tcp.local`) and choose mirror or virtual extended display.
 
 ### Ending a session
 
@@ -206,7 +222,8 @@ Compared with [upstream Wormhole Display](https://github.com/pgodlews/wormhole-d
 - **Android 11+ launch crash fixed**: the display was read from the application context, which throws on API 30+.
 - **Targets current Android** (minSdk 30, targetSdk 35): notification permission (Android 13), foreground-service type (Android 14), edge-to-edge with hidden system bars (Android 15). Portals (Android 9-10) are no longer supported.
 - **Stable on lossy Wi-Fi**: 90-frame decoder buffer (was 12) with catch-up that shows only the newest frame, and a low-latency Wi-Fi lock.
-- **Preferred resolution** setting and **in-session settings** on long press.
+- **Windows & Linux support (Miracast over Infrastructure / MS-MICE)**: advertises `_display._tcp.local` (port 7250), handles MS-MICE + Wi-Fi Display RTSP `M1`–`M16` negotiation, and demuxes RTP/MPEG-2 TS video (H.264/HEVC) and 48 kHz LPCM/AAC audio into the shared hardware renderers.
+- **Preferred resolution** setting, **version indicator** with GitHub release check, and **in-session settings** on long press.
 
 ---
 
