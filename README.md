@@ -3,7 +3,7 @@
   <h1>Second Display</h1>
   <p><strong>Turn an Android tablet or phone into a wireless display and speaker for your Mac, iPhone, iPad, Windows PC, and Linux desktop.</strong></p>
   <p>AirPlay &amp; Miracast over Infrastructure (MS-MICE) screen mirroring and extended display receiver for Android 11+.</p>
-  <p><a href="https://github.com/swiderekart-max/second-display/releases/latest"><strong>⬇ Download the latest release (APK)</strong></a> · <a href="https://github.com/swiderekart-max/second-display/releases">All releases</a></p>
+  <p><a href="https://github.com/swide-git/second-display/releases/latest"><strong>⬇ Download the latest release (APK)</strong></a> · <a href="https://github.com/swide-git/second-display/releases">All releases</a></p>
 </div>
 
 ---
@@ -61,7 +61,7 @@ Tested on a Xiaomi Pad (Android 14, HyperOS, 2000×1200) with a MacBook as the s
 
 ### 1. Install the APK
 
-Download `second-display.apk` from the [latest release](https://github.com/swiderekart-max/second-display/releases/latest) (or build it yourself, see [Building from source](#building-from-source)), then either open it on the device or install it over USB:
+Download `second-display.apk` from the [latest release](https://github.com/swide-git/second-display/releases/latest) (or build it yourself, see [Building from source](#building-from-source)), then either open it on the device or install it over USB:
 
 ```bash
 adb install -r second-display.apk
@@ -172,7 +172,7 @@ Build, test and install:
 export SECOND_DISPLAY_VERSION_CODE=30003 SECOND_DISPLAY_VERSION_NAME=0.4.0-dev
 ./gradlew :app:testDebugUnitTest :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell am start -n io.github.swiderekartmax.seconddisplay/.MainActivity
+adb shell am start -n io.github.swidegit.seconddisplay/io.github.swiderekartmax.seconddisplay.MainActivity
 ```
 
 `./scripts/build.sh` does the same build and copies the APK to `dist/second-display.apk`.
@@ -192,7 +192,7 @@ Releases are automatic. Every merge to `main` builds, signs and publishes the ne
 | `#major` | **v1.0.0** |
 | `[skip release]` | build and tests only, nothing published |
 
-Pull requests get unit tests and a debug APK artifact. Pushing a `vX.Y.Z` tag by hand still publishes that exact version. Signing uses the repository secrets `SECOND_DISPLAY_KEYSTORE_BASE64`, `SECOND_DISPLAY_KEYSTORE_PASSWORD`, `SECOND_DISPLAY_KEY_ALIAS` and `SECOND_DISPLAY_KEY_PASSWORD`; without them a release fails instead of publishing an unsigned APK.
+Each release carries the signed APK for sideloading and a signed App Bundle (`second-display.aab`) for Google Play. Pull requests get unit tests and a debug APK artifact. Pushing a `vX.Y.Z` tag by hand still publishes that exact version. Signing uses the repository secrets `SECOND_DISPLAY_KEYSTORE_BASE64`, `SECOND_DISPLAY_KEYSTORE_PASSWORD`, `SECOND_DISPLAY_KEY_ALIAS` and `SECOND_DISPLAY_KEY_PASSWORD`; without them a release fails instead of publishing an unsigned APK.
 
 ---
 
@@ -222,7 +222,7 @@ See [the architecture notes](docs/architecture.md) for details.
 
 Compared with [upstream Wormhole Display](https://github.com/pgodlews/wormhole-display):
 
-- **New name and identity**: *Second Display*, application ID `io.github.swiderekartmax.seconddisplay` (installs alongside the original, not over it), new icon.
+- **New name and identity**: *Second Display*, application ID `io.github.swidegit.seconddisplay` (installs alongside the original, not over it), new icon.
 
 - **Android 11+ launch crash fixed**: the display was read from the application context, which throws on API 30+.
 - **Targets current Android** (minSdk 30, targetSdk 35): notification permission (Android 13), foreground-service type (Android 14), edge-to-edge with hidden system bars (Android 15). Portals (Android 9-10) are no longer supported.

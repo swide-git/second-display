@@ -120,31 +120,34 @@ jobs:
       - name: Unit tests
         run: ./gradlew --no-daemon :app:testDebugUnitTest
 
-      - name: Build APK
+      - name: Build APK and App Bundle
         run: |
           mkdir -p dist
           if [ -n "${SECOND_DISPLAY_KEYSTORE_PATH:-}" ]; then
-            ./gradlew --no-daemon :app:assembleRelease
+            # The signed .aab is what Google Play takes; the .apk is for sideloading.
+            ./gradlew --no-daemon :app:assembleRelease :app:bundleRelease
             cp app/build/outputs/apk/release/app-release.apk dist/second-display.apk
+            cp app/build/outputs/bundle/release/app-release.aab dist/second-display.aab
+            (cd dist && sha256sum second-display.aab > second-display.aab.sha256)
           else
             ./gradlew --no-daemon :app:assembleDebug
             cp app/build/outputs/apk/debug/app-debug.apk dist/second-display.apk
           fi
           (cd dist && sha256sum second-display.apk > second-display.apk.sha256)
-          cat dist/second-display.apk.sha256
+          cat dist/*.sha256
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
         with:
           name: second-display-${{ env.SECOND_DISPLAY_VERSION_NAME }}
-          path: dist/second-display.apk*
+          path: dist/second-display.*
 
       - name: Publish tagged release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/second-display.apk dist/second-display.apk.sha256 \
+          gh release create "$GITHUB_REF_NAME" dist/second-display.* \
             --verify-tag --generate-notes \
             --title "Second Display $GITHUB_REF_NAME"
 
@@ -156,6 +159,6 @@ jobs:
         run: |
           # The rolling "latest" pre-release is retired; remove it if it is still there.
           gh release delete latest --cleanup-tag --yes 2>/dev/null || true
-          gh release create "$TAG" dist/second-display.apk dist/second-display.apk.sha256 \
+          gh release create "$TAG" dist/second-display.* \
             --target "$GITHUB_SHA" --generate-notes \
             --title "Second Display $TAG"

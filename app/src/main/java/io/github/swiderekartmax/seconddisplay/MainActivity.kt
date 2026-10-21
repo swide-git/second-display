@@ -579,7 +579,7 @@ private fun DashboardScreen(
     LaunchedEffect(Unit) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             runCatching {
-                val url = java.net.URL("https://api.github.com/repos/swiderekart-max/second-display/releases/latest")
+                val url = java.net.URL("https://api.github.com/repos/swide-git/second-display/releases/latest")
                 val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
                     connectTimeout = 5000
                     readTimeout = 5000
@@ -655,7 +655,7 @@ private fun DashboardScreen(
                                 context.startActivity(
                                     Intent(
                                         Intent.ACTION_VIEW,
-                                        Uri.parse("https://github.com/swiderekart-max/second-display/releases/latest")
+                                        Uri.parse("https://github.com/swide-git/second-display/releases/latest")
                                     )
                                 )
                             }
