@@ -12,7 +12,7 @@ val releaseKeystorePath = providers.environmentVariable("SECOND_DISPLAY_KEYSTORE
 
 android {
     namespace = "io.github.swiderekartmax.seconddisplay"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = "27.3.13750724"
     val bundledNdk = File(rootDir, ".tools/ndk-r27d")
     if (bundledNdk.isDirectory) {
@@ -37,7 +37,7 @@ android {
         applicationId = "io.github.swidegit.seconddisplay"
         // Android 11+ phones and tablets. Portals (Android 9-10) are not supported by this build.
         minSdk = 30
-        targetSdk = 35
+        targetSdk = 36
         versionCode = wormholeVersionCode
         versionName = wormholeVersionName
         ndk { abiFilters += "arm64-v8a" }

@@ -21,6 +21,11 @@
         <activity android:name=".MainActivity" android:label="@string/app_name" android:exported="true" android:launchMode="singleTop"
             android:icon="@mipmap/ic_launcher" android:banner="@drawable/tv_banner" android:screenOrientation="unspecified"
             android:configChanges="orientation|screenSize|keyboardHidden">
+            <!-- Android 16 ignores requested orientation on screens >= 600dp for targetSdk 36. The
+                 orientation setting is the receiver's display mode, so keep it honoured on tablets.
+                 Only works for targetSdk 36; Android 17 drops the opt-out. -->
+            <property android:name="android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY"
+                android:value="true" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
