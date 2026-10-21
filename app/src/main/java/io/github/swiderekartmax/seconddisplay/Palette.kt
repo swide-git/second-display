@@ -1,39 +1,79 @@
 package io.github.swiderekartmax.seconddisplay
 
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
 /**
- * Second Display colours: graphite surfaces with an orange accent. Every colour in the UI
- * comes from here; the launcher icon (`res/drawable/ic_launcher_foreground.xml`,
- * `res/values/ic_launcher_background.xml`) and `docs/images/second_display_icon.svg`
- * use the same Background / Accent / AccentContainer values.
+ * Second Display colours. The UI follows the wallpaper (Material You) on Android 12+; these
+ * orange schemes are the fallback on Android 11 and the brand colours of the launcher icon
+ * (`res/drawable/ic_launcher_foreground.xml`, `res/values/ic_launcher_background.xml`,
+ * `docs/images/second_display_icon.svg`).
  */
 object Palette {
-    val Background = Color(0xFF121214)
-    val BackgroundScrim = Color(0xDD121214)
-    val Surface = Color(0xFF1C1C21)
-    val SurfaceVariant = Color(0xFF26262C)
-    val Chip = Color(0xFF17171B)
-    val Border = Color(0xFF2C2C33)
-    val BorderStrong = Color(0xFF3A3A43)
-
+    /** Launcher icon background and accent. */
+    val IconBackground = Color(0xFF121214)
     val Accent = Color(0xFFFF9F43)
-    val AccentTranslucent = Color(0x66FF9F43)
-    val AccentFocused = Color(0xFFFFBE7A)
-    /** Selected chips, "Ready" pill. */
-    val AccentContainer = Color(0xFF4A3218)
-    /** Darkest accent tint: tablet screen in the icon, deep backgrounds. */
-    val AccentContainerDark = Color(0xFF3A2A18)
 
-    val Text = Color(0xFFF4F4F5)
-    val TextSecondary = Color(0xFFE4E4E7)
-    val TextMuted = Color(0xFFA1A1AA)
-    val TextFaint = Color(0xFF71717A)
+    /** Overlays drawn on top of video stay dark whatever the theme. */
+    val OverlayScrim = Color(0xCC000000)
+    val OverlayText = Color(0xFFF4F4F5)
+    val OverlayMuted = Color(0xFFA1A1AA)
 
-    // Warnings are yellow so they stay distinct from the orange accent.
-    val Warning = Color(0xFFEAB308)
-    val WarningBright = Color(0xFFFDE047)
-    val WarningContainer = Color(0xFF2A2410)
-    val Error = Color(0xFFF87171)
-    val White = Color(0xFFFFFFFF)
+    val LightScheme: ColorScheme = lightColorScheme(
+        primary = Color(0xFF904D00),
+        onPrimary = Color(0xFFFFFFFF),
+        primaryContainer = Color(0xFFFFDCC2),
+        onPrimaryContainer = Color(0xFF2F1500),
+        secondary = Color(0xFF745846),
+        onSecondary = Color(0xFFFFFFFF),
+        secondaryContainer = Color(0xFFFFDCC2),
+        onSecondaryContainer = Color(0xFF2B1709),
+        tertiary = Color(0xFF5E6135),
+        onTertiary = Color(0xFFFFFFFF),
+        tertiaryContainer = Color(0xFFE3E6AF),
+        onTertiaryContainer = Color(0xFF1B1D00),
+        background = Color(0xFFFFF8F5),
+        onBackground = Color(0xFF221A15),
+        surface = Color(0xFFFFF8F5),
+        onSurface = Color(0xFF221A15),
+        surfaceVariant = Color(0xFFF4DED3),
+        onSurfaceVariant = Color(0xFF52443B),
+        outline = Color(0xFF85746A),
+        outlineVariant = Color(0xFFD7C3B7),
+        surfaceContainerLowest = Color(0xFFFFFFFF),
+        surfaceContainerLow = Color(0xFFFFF1EA),
+        surfaceContainer = Color(0xFFFCEBE2),
+        surfaceContainerHigh = Color(0xFFF6E5DC),
+        surfaceContainerHighest = Color(0xFFF0DFD7)
+    )
+
+    val DarkScheme: ColorScheme = darkColorScheme(
+        primary = Color(0xFFFFB77C),
+        onPrimary = Color(0xFF4E2600),
+        primaryContainer = Color(0xFF6F3900),
+        onPrimaryContainer = Color(0xFFFFDCC2),
+        secondary = Color(0xFFE3BFA8),
+        onSecondary = Color(0xFF422B1B),
+        secondaryContainer = Color(0xFF5B4130),
+        onSecondaryContainer = Color(0xFFFFDCC2),
+        tertiary = Color(0xFFC7CA95),
+        onTertiary = Color(0xFF30330B),
+        tertiaryContainer = Color(0xFF464A20),
+        onTertiaryContainer = Color(0xFFE3E6AF),
+        background = Color(0xFF19120D),
+        onBackground = Color(0xFFF0DFD6),
+        surface = Color(0xFF19120D),
+        onSurface = Color(0xFFF0DFD6),
+        surfaceVariant = Color(0xFF52443B),
+        onSurfaceVariant = Color(0xFFD7C3B7),
+        outline = Color(0xFF9F8D83),
+        outlineVariant = Color(0xFF52443B),
+        surfaceContainerLowest = Color(0xFF130D08),
+        surfaceContainerLow = Color(0xFF221A15),
+        surfaceContainer = Color(0xFF261E19),
+        surfaceContainerHigh = Color(0xFF312823),
+        surfaceContainerHighest = Color(0xFF3C332D)
+    )
 }

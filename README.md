@@ -1,8 +1,8 @@
 <div align="center">
   <img src="docs/images/second_display_icon.svg" width="160" alt="Second Display icon" />
   <h1>Second Display</h1>
-  <p><strong>Turn an Android tablet or phone into a wireless display and speaker for your Mac, iPhone, iPad, Windows PC, and Linux desktop.</strong></p>
-  <p>AirPlay &amp; Miracast over Infrastructure (MS-MICE) screen mirroring and extended display receiver for Android 11+.</p>
+  <p><strong>Turn an Android tablet or phone into a wireless display and speaker for your Mac, iPhone and iPad.</strong></p>
+  <p>AirPlay screen mirroring and extended display receiver for Android 11+.</p>
   <p><a href="https://github.com/swide-git/second-display/releases/latest"><strong>⬇ Download the latest release (APK)</strong></a> · <a href="https://github.com/swide-git/second-display/releases">All releases</a></p>
 </div>
 
@@ -10,12 +10,9 @@
 
 ## What it is
 
-Second Display makes an Android device show up in:
-- **macOS / iOS / iPadOS**: **Control Center → Screen Mirroring** (via AirPlay)
-- **Windows 10 / 11**: **`Win + K` (Cast / Wireless Display)** (via Miracast over Infrastructure / MS-MICE)
-- **Linux**: **GNOME Network Displays** (via `_display._tcp.local` / MS-MICE)
+Second Display makes an Android device show up in **Control Center → Screen Mirroring** on a Mac, iPhone or iPad (AirPlay). The Mac can use it as an **extended display** or a **mirror**, with sound. Nothing needs to be installed on the Apple side.
 
-Your computer can use the Android device as an **extended display** or a **mirror**, with sound. Nothing needs to be installed on Mac, iPhone, iPad, or Windows.
+Windows and Linux are not supported. Windows finds wireless displays over Wi-Fi Direct, which an ordinary Android app cannot offer; an earlier Miracast receiver was removed after Windows could not see it.
 
 It is an ordinary app: **no root, no cloud, no account**. It only talks to devices on your local Wi-Fi.
 
@@ -27,8 +24,8 @@ Second Display is an independent community project and is not affiliated with Ap
 
 ## Features
 
-- **Shows up natively on Apple, Windows, and Linux**, under a name you choose (advertising both `_airplay._tcp` on port 7000 and `_display._tcp` on port 7250).
-- **Extended display or mirror**: macOS, Windows 10/11, and Linux can use the device as a second screen or mirror.
+- **Shows up natively on Mac, iPhone and iPad**, under a name you choose (`_airplay._tcp` and `_raop._tcp` on port 7000).
+- **Extended display or mirror**: a Mac can use the device as a second screen or mirror it.
 - **Preferred resolution**: offer the sender the native panel size, a common size (1920×1200, 1920×1080, 1680×1050, 1600×900, 1440×900, 1280×720) or 80 / 64 / 50 % of the panel. Lower sizes are lighter on Wi-Fi. Sizes larger than the panel are hidden; sizes with a different aspect are letterboxed, never stretched.
 - **Pinch to zoom**: spread two fingers on the mirrored picture to zoom in up to 5×, drag to move around, double tap to go back. The zoom is local: the sender keeps sending the whole screen.
 - **Settings during a session**: long press on the mirrored picture. Stream stats and speaker output apply at once; resolution and HEVC end the session, because the sender only reads them when it connects.
@@ -38,7 +35,7 @@ Second Display is an independent community project and is not affiliated with Ap
 - **AirPlay speaker (audio-only)** from an iPhone or iPad, with cover art, title and progress full screen.
 - **Opens when you connect**: the receiver stays available in the background and brings itself full screen when a stream starts. It can also start at boot.
 - **Portrait, landscape or auto** orientation.
-- **Dashboard and stats**: network details, recent connections and an optional on-screen stats overlay (FPS, bitrate, codec).
+- **Material You dashboard**: follows your wallpaper colours and light or dark mode (Android 12+), with a status card, quick resolution and orientation pickers, recent connections and an optional on-screen stats overlay (FPS, bitrate, codec).
 
 ---
 
@@ -49,11 +46,9 @@ Second Display is an independent community project and is not affiliated with Ap
 | **Android** | 11 or newer (API 30+); built for Android 16 (targetSdk 36) |
 | **CPU** | 64-bit ARM (`arm64-v8a`), i.e. practically every phone and tablet from recent years |
 | **Network** | Device and sender on the **same Wi-Fi network** (5 GHz strongly recommended) |
-| **Sender** | Mac, iPhone or iPad (Screen Mirroring), Windows 10/11 (`Win + K`), or Linux (GNOME Network Displays) |
+| **Sender** | Mac, iPhone or iPad (Screen Mirroring / AirPlay) |
 
 Tested on a Xiaomi Pad (Android 14, HyperOS, 2000×1200) with a MacBook as the sender. Android 15 and 16 are supported by the code but not yet tested on a device; reports are welcome.
-
-**Windows and Linux (Miracast) are new and not yet tested on a device.** Windows finds Miracast receivers over Wi-Fi Direct before it uses the local network, and an ordinary Android app cannot advertise itself that way, so `Win + K` may not list the device at all. GNOME Network Displays on Linux browses the local network directly and is the more likely sender to work. Reports either way are welcome.
 
 ---
 
@@ -76,8 +71,8 @@ Google Play Protect may warn about an app from an unknown source and block the i
 Open **Second Display** and:
 
 1. **Allow notifications** when asked. The receiver runs as a foreground service; without the permission it still works, but its notification is hidden.
-2. Tap **Allow** next to *Auto-open on connect* and turn on **Display over other apps**. Android only lets the app bring itself to the front for an incoming stream with that permission.
-3. Leave **Run in Background** and **Start on Boot** on.
+2. Tap **Allow** next to *Open when a stream starts* and turn on **Display over other apps**. Android only lets the app bring itself to the front for an incoming stream with that permission.
+3. Leave **Run in background** and **Start on boot** on.
 
 ### 3. Keep it alive (Xiaomi, Samsung, Huawei, OnePlus and others)
 
@@ -102,19 +97,6 @@ For crisp text, see the [text sharpness guide](docs/macos-text-sharpness.md).
 
 **Control Center → Screen Mirroring**, pick the device.
 
-### From Windows 10 or 11
-
-Untested, and discovery may not work; see [Requirements](#requirements).
-
-1. Windows PC and Android device on the same Wi-Fi network (set the Windows Wi-Fi network profile to **Private** so mDNS/TCP 7250 is allowed by Windows Firewall).
-2. Press **`Win + K`** to open the Cast / Wireless Display menu and select **Second Display**.
-3. Choose **Extend** or **Duplicate** in the Windows projection bar (`Win + P`).
-
-### From Linux
-
-1. Install and open **GNOME Network Displays**.
-2. Select **Second Display** (discovered over `_display._tcp.local`) and choose mirror or virtual extended display.
-
 ### Ending a session
 
 Press **Back** or **Home** on the device, tap **Disconnect** in the in-session settings, or stop Screen Mirroring on the sender. Installing an update also ends a running session.
@@ -123,17 +105,21 @@ Press **Back** or **Home** on the device, tap **Disconnect** in the in-session s
 
 ## Settings
 
-On the dashboard (when nothing is connected), under **Controls & Playback**:
+On the dashboard (when nothing is connected):
 
-| Setting | What it does |
-|---|---|
-| Screen Orientation | Landscape, portrait, or auto (devices with a rotation sensor) |
-| Preferred Resolution | Size offered to the sender; tap the value to open the list |
-| Speaker Output | Play sound through the device speakers |
-| H.265 video | Offer HEVC; the sender decides whether to use it. A Mac on Wi-Fi often stays on H.264 |
-| Telemetry Overlay | FPS, bitrate, resolution and codec in the top-left corner |
-| Run in Background / Start on Boot | Keep the receiver discoverable |
-| Bonjour Service Name | Name shown in Screen Mirroring (default: *Second Display*) |
+| Setting | Where | What it does |
+|---|---|---|
+| Resolution | tile under the status card | Size offered to the sender; tap to open the list |
+| Orientation | tile under the status card | Landscape, portrait, or auto (devices with a rotation sensor) |
+| Speaker | Settings | Play sound through the device speakers |
+| Open when a stream starts | Settings | Needs *Display over other apps*; tap **Allow** to grant it |
+| Run in background / Start on boot | Settings | Keep the receiver discoverable |
+| H.265 video | Settings | Offer HEVC; the sender decides whether to use it. A Mac on Wi-Fi often stays on H.264 |
+| Stream stats | Settings | FPS, bitrate, resolution and codec in the top-left corner |
+| Name | This receiver | Name shown in Screen Mirroring (default: *Second Display*) |
+| Restart receiver | This receiver | Re-announces the receiver on the network |
+
+The version in the top bar opens the releases page; it turns into **Update to vX.Y.Z** when a newer release exists.
 
 During a session, **long press on the picture** for stats, speaker, resolution, HEVC and Disconnect. **Pinch** zooms the picture, **drag** moves a zoomed picture and **double tap** resets it.
 
@@ -143,7 +129,7 @@ During a session, **long press on the picture** for stats, speaker, resolution, 
 
 | Symptom | Cause and fix |
 |---|---|
-| Device not listed in Screen Mirroring | Not on the same network, or the network isolates clients (common on office and guest Wi-Fi). Try **Receiver Service → Restart**. |
+| Device not listed in Screen Mirroring | Not on the same network, or the network isolates clients (common on office and guest Wi-Fi). Try **This receiver → Restart**. |
 | Session drops or the picture stutters | Usually the Wi-Fi link: 2.4 GHz is slow and crowded, and every frame crosses it twice (sender → router → device). Move both to **5 GHz** and/or pick a lower **Preferred Resolution**. |
 | Picture freezes after a while, app gone | The system closed it. See [Keep it alive](#3-keep-it-alive-xiaomi-samsung-huawei-oneplus-and-others). |
 | Black bars around the picture | The chosen resolution has a different aspect than the panel. Pick **Native** or a percentage. |
@@ -153,7 +139,7 @@ During a session, **long press on the picture** for stats, speaker, resolution, 
 
 ## Building from source
 
-Requirements: **JDK 17**, **Android SDK** with platform 35 and build-tools 35, **NDK 27.3.13750724** and **CMake 3.22.1** (the native AirPlay core is compiled on every build). Prebuilt static OpenSSL and libplist are committed under `app/src/main/cpp/deps/`.
+Requirements: **JDK 17**, **Android SDK** with platform 36 and build-tools 35, **NDK 27.3.13750724** and **CMake 3.22.1** (the native AirPlay core is compiled on every build). Prebuilt static OpenSSL and libplist are committed under `app/src/main/cpp/deps/`.
 
 On macOS with Homebrew:
 
@@ -227,8 +213,7 @@ Compared with [upstream Wormhole Display](https://github.com/pgodlews/wormhole-d
 - **Android 11+ launch crash fixed**: the display was read from the application context, which throws on API 30+.
 - **Targets current Android** (minSdk 30, targetSdk 36): notification permission (Android 13), foreground-service type (Android 14), edge-to-edge with hidden system bars (Android 15), orientation lock kept on tablets (Android 16). Portals (Android 9-10) are no longer supported.
 - **Stable on lossy Wi-Fi**: 90-frame decoder buffer (was 12) with catch-up that shows only the newest frame, and a low-latency Wi-Fi lock.
-- **Windows & Linux support (Miracast over Infrastructure / MS-MICE)**: advertises `_display._tcp.local` (port 7250), handles MS-MICE + Wi-Fi Display RTSP `M1`–`M16` negotiation, and demuxes RTP/MPEG-2 TS video (H.264/HEVC) and 48 kHz LPCM/AAC audio into the shared hardware renderers.
-- **Preferred resolution** setting, **version indicator** with GitHub release check, and **in-session settings** on long press.
+- **Material You interface** (wallpaper colours, light and dark mode), **preferred resolution** setting, **pinch to zoom**, **version indicator** with GitHub release check, and **in-session settings** on long press.
 
 ---
 

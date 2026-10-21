@@ -44,8 +44,6 @@ object NativeBridge {
     const val CT_PCM = 0
     const val CT_ALAC = 2
     const val CT_AAC_ELD = 8
-    const val CT_WFD_LPCM_48K = 16
-    const val CT_WFD_AAC_48K = 17
 
     init { System.loadLibrary("wormhole") }
 

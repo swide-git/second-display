@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package io.github.swiderekartmax.seconddisplay
 
 import android.Manifest
@@ -18,34 +20,37 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
@@ -56,9 +61,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -211,16 +214,7 @@ class MainActivity : ComponentActivity() {
             val resolutionPreset by WormholeServer.resolutionPreset.collectAsState()
             var showMirrorSettings by remember { mutableStateOf(false) }
 
-            MaterialTheme(
-                colorScheme = darkColorScheme(
-                    primary = Palette.Accent,
-                    background = Palette.Background,
-                    surface = Palette.Surface,
-                    surfaceVariant = Palette.SurfaceVariant,
-                    onSurface = Palette.Text,
-                    onSurfaceVariant = Palette.TextMuted
-                )
-            ) {
+            SecondDisplayTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     if (mirroring) {
                         BackHandler { WormholeServer.disconnectClient("back") }
@@ -488,57 +482,239 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/** D-pad / keyboard focus ring for clickable rows and tiles (TVs and tablets with keyboards). */
 @Composable
-private fun Modifier.tvFocusable(
-    shape: Shape = RoundedCornerShape(8.dp),
-    focusedBorderColor: Color = Palette.Accent,
-    focusedBackgroundColor: Color = Palette.BorderStrong,
-    unfocusedBackgroundColor: Color = Color.Transparent,
-    unfocusedBorderColor: Color = Color.Transparent,
-    borderWidth: Dp = 2.dp,
-    onClick: (() -> Unit)? = null
-): Modifier {
-    var isFocused by remember { mutableStateOf(false) }
+private fun Modifier.focusRing(shape: Shape): Modifier {
+    var focused by remember { mutableStateOf(false) }
+    val color = MaterialTheme.colorScheme.primary
     return this
-        .onFocusChanged { isFocused = it.isFocused }
-        .then(
-            if (onClick != null) {
-                Modifier.clickable(onClick = onClick)
-            } else {
-                Modifier.focusable()
-            }
-        )
-        .background(if (isFocused) focusedBackgroundColor else unfocusedBackgroundColor, shape)
-        .border(
-            borderWidth,
-            if (isFocused) focusedBorderColor else unfocusedBorderColor,
-            shape
-        )
+        .onFocusChanged { focused = it.isFocused }
+        .border(if (focused) 2.dp else 0.dp, if (focused) color else Color.Transparent, shape)
 }
 
 @Composable
-private fun InfoRow(
-    label: String,
-    value: String,
-    fontSize: TextUnit = 14.sp,
-    modifier: Modifier = Modifier
+private fun SectionCard(
+    title: String,
+    modifier: Modifier = Modifier,
+    trailing: @Composable (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit
 ) {
-    Row(
+    Card(
         modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+    ) {
+        Column(modifier = Modifier.padding(vertical = 12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f)
+                )
+                trailing?.invoke()
+            }
+            content()
+        }
+    }
+}
+
+/** A settings row: title, supporting text, and a switch or a trailing action. */
+@Composable
+private fun SettingRow(
+    title: String,
+    supporting: String,
+    icon: ImageVector,
+    onClick: (() -> Unit)?,
+    trailing: @Composable () -> Unit,
+    titleColor: Color = MaterialTheme.colorScheme.onSurface
+) {
+    val shape = RoundedCornerShape(16.dp)
+    ListItem(
+        headlineContent = { Text(title, color = titleColor) },
+        supportingContent = { Text(supporting) },
+        leadingContent = { Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+        trailingContent = trailing,
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier
+            .padding(horizontal = 8.dp)
+            .clip(shape)
+            .then(if (onClick != null) Modifier.focusRing(shape).clickable(onClick = onClick) else Modifier)
+    )
+}
+
+@Composable
+private fun SwitchRow(title: String, supporting: String, icon: ImageVector, checked: Boolean, onToggle: () -> Unit) {
+    SettingRow(
+        title = title,
+        supporting = supporting,
+        icon = icon,
+        onClick = onToggle,
+        trailing = { Switch(checked = checked, onCheckedChange = null) }
+    )
+}
+
+@Composable
+private fun InfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = label, fontSize = fontSize, color = Palette.TextMuted)
-        Spacer(modifier = Modifier.width(6.dp))
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(modifier = Modifier.width(12.dp))
         Text(
-            text = value,
-            fontSize = fontSize,
+            value,
+            style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
-            color = Palette.TextSecondary,
             maxLines = 1,
-            softWrap = false
+            overflow = TextOverflow.Ellipsis
         )
     }
+}
+
+/** Pulsing dot: the receiver is waiting for a sender. */
+@Composable
+private fun PulseDot(color: Color, modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "pulse")
+    val ring by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1600, easing = LinearEasing)),
+        label = "ring"
+    )
+    Box(modifier = modifier.size(28.dp), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .size(12.dp + 16.dp * ring)
+                .background(color.copy(alpha = 0.35f * (1f - ring)), CircleShape)
+        )
+        Box(Modifier.size(12.dp).background(color, CircleShape))
+    }
+}
+
+@Composable
+private fun StatusCard(
+    ready: Boolean,
+    status: String,
+    serviceName: String,
+    networkDetails: NetworkInfoHelper.NetworkDetails,
+    modifier: Modifier = Modifier
+) {
+    val colors = MaterialTheme.colorScheme
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = colors.primaryContainer, contentColor = colors.onPrimaryContainer)
+    ) {
+        Column(modifier = Modifier.padding(24.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (ready) {
+                    PulseDot(color = colors.primary)
+                } else {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = if (ready) "Ready to connect" else status,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "On your Mac, iPhone or iPad open Screen Mirroring and choose",
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                text = serviceName,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = colors.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AssistChip(
+                    onClick = {},
+                    label = { Text(networkDetails.wifiSsid, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    leadingIcon = { Icon(AppIcons.Wifi, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                )
+                AssistChip(
+                    onClick = {},
+                    label = { Text(networkDetails.ipAddress, maxLines = 1) },
+                    leadingIcon = { Icon(Icons.Filled.Info, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                )
+            }
+        }
+    }
+}
+
+/** Quick picker tile: label, current value, opens a menu. */
+@Composable
+private fun PickerTile(
+    label: String,
+    value: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    menu: @Composable (expanded: Boolean, dismiss: () -> Unit) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(24.dp)
+    Box(modifier = modifier) {
+        Card(
+            onClick = { expanded = true },
+            shape = shape,
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+            modifier = Modifier.fillMaxWidth().focusRing(shape)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                Text(
+                    value,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        menu(expanded) { expanded = false }
+    }
+}
+
+@Composable
+private fun ResolutionMenu(selected: ResolutionPreset, expanded: Boolean, onDismiss: () -> Unit, onSelected: (ResolutionPreset) -> Unit) {
+    val available = WormholeServer.availableResolutionPresets()
+    // A preset that does not fit this panel is not applied; show what is actually advertised.
+    val effective = if (selected in available) selected else ResolutionPreset.NATIVE
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        available.forEach { preset ->
+            DropdownMenuItem(
+                text = { Text(WormholeServer.resolutionLabel(preset)) },
+                leadingIcon = if (preset == effective) {
+                    { Icon(Icons.Filled.Check, contentDescription = "Selected") }
+                } else null,
+                onClick = {
+                    onDismiss()
+                    onSelected(preset)
+                }
+            )
+        }
+    }
+}
+
+private fun ScreenOrientation.description(autoSupported: Boolean): String = when (this) {
+    ScreenOrientation.LANDSCAPE -> if (autoSupported) "Always landscape" else "Landscape"
+    ScreenOrientation.PORTRAIT -> if (autoSupported) "Always portrait" else "Portrait"
+    ScreenOrientation.AUTO -> "Follows the tilt sensor"
 }
 
 @Composable
@@ -610,869 +786,258 @@ private fun DashboardScreen(
             listOf(ScreenOrientation.LANDSCAPE, ScreenOrientation.PORTRAIT)
         }
     }
-    val screenHeightDp = configuration.screenHeightDp
-    val isTvOrCompact = screenHeightDp <= 650
-    val isCompactScreen = displayInfo.height <= 900 || screenHeightDp <= 800
+    val ready = status.startsWith("Visible")
+    val wide = configuration.screenWidthDp >= 840 ||
+        (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE && configuration.screenWidthDp >= 600)
 
-    val horizontalPadding = if (isTvOrCompact) 20.dp else if (isCompactScreen) 28.dp else 48.dp
-    val verticalPadding = if (isTvOrCompact) 8.dp else if (isCompactScreen) 16.dp else 36.dp
-    val cardSpacing = if (isTvOrCompact) 5.dp else if (isCompactScreen) 10.dp else 20.dp
-    val cardPadding = if (isTvOrCompact) 6.dp else if (isCompactScreen) 14.dp else 20.dp
-    val dividerSpacing = if (isTvOrCompact) 1.dp else if (isCompactScreen) 8.dp else 12.dp
-    val columnSpacing = if (isTvOrCompact) 14.dp else if (isCompactScreen) 20.dp else 28.dp
+    val statusCard = @Composable {
+        StatusCard(ready = ready, status = status, serviceName = serviceName, networkDetails = networkDetails)
+    }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            // The window extends into the cutout (edge to edge); keep text clear of the camera.
-            .windowInsetsPadding(WindowInsets.displayCutout)
-            .padding(horizontal = horizontalPadding, vertical = verticalPadding)
-    ) {
-        // Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "Second Display",
-                        fontSize = if (isTvOrCompact) 20.sp else if (isCompactScreen) 26.sp else 32.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = Palette.SurfaceVariant,
-                        border = BorderStroke(1.dp, Palette.Border),
-                        modifier = Modifier.clickable {
-                            runCatching {
-                                context.startActivity(
-                                    Intent(
-                                        Intent.ACTION_VIEW,
-                                        Uri.parse("https://github.com/swide-git/second-display/releases/latest")
-                                    )
-                                )
+    val pickers = @Composable {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+            val available = WormholeServer.availableResolutionPresets()
+            val effective = if (resolutionPreset in available) resolutionPreset else ResolutionPreset.NATIVE
+            PickerTile(
+                label = "Resolution",
+                value = WormholeServer.resolutionLabel(effective),
+                icon = AppIcons.AspectRatio,
+                modifier = Modifier.weight(1f)
+            ) { expanded, dismiss ->
+                ResolutionMenu(resolutionPreset, expanded, dismiss, onResolutionPresetChanged)
+            }
+            PickerTile(
+                label = "Orientation",
+                value = orientationSetting.label,
+                icon = Icons.Filled.Refresh,
+                modifier = Modifier.weight(1f)
+            ) { expanded, dismiss ->
+                DropdownMenu(expanded = expanded, onDismissRequest = dismiss) {
+                    availableOrientations.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option.description(isAutoSupported)) },
+                            leadingIcon = if (option == orientationSetting) {
+                                { Icon(Icons.Filled.Check, contentDescription = "Selected") }
+                            } else null,
+                            onClick = {
+                                dismiss()
+                                onOrientationSettingChanged(option)
                             }
-                        }
-                    ) {
-                        Text(
-                            text = if (hasNewerRelease) "v$appVersion → v$latestReleaseVersion" else "v$appVersion",
-                            fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Medium,
-                            color = if (hasNewerRelease) Palette.Warning else Palette.TextMuted,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(if (isTvOrCompact) 2.dp else if (isCompactScreen) 3.dp else 6.dp))
+            }
+        }
+    }
+
+    val settingsCard = @Composable {
+        SectionCard(title = "Settings") {
+            SwitchRow(
+                title = "Speaker",
+                supporting = if (audioEnabled) "Sound plays on this device" else "Muted on this device",
+                icon = AppIcons.VolumeUp,
+                checked = audioEnabled,
+                onToggle = { onAudioEnabledChanged(!audioEnabled) }
+            )
+            SettingRow(
+                title = "Open when a stream starts",
+                supporting = if (canAutoOpen) "The receiver comes to the front on its own"
+                             else "Needs \"Display over other apps\"",
+                icon = AppIcons.OpenInNew,
+                onClick = if (!canAutoOpen) onRequestAutoOpen else null,
+                titleColor = if (canAutoOpen) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
+                trailing = {
+                    if (canAutoOpen) {
+                        Icon(Icons.Filled.CheckCircle, contentDescription = "Allowed", tint = MaterialTheme.colorScheme.primary)
+                    } else {
+                        FilledTonalButton(onClick = onRequestAutoOpen) { Text("Allow") }
+                    }
+                }
+            )
+            SwitchRow(
+                title = "Run in background",
+                supporting = "Stay visible when the app is closed",
+                icon = Icons.Filled.Notifications,
+                checked = runInBackground,
+                onToggle = { onRunInBackgroundChanged(!runInBackground) }
+            )
+            SwitchRow(
+                title = "Start on boot",
+                supporting = "Start the receiver when the device turns on",
+                icon = AppIcons.Power,
+                checked = startOnBoot,
+                onToggle = { onStartOnBootChanged(!startOnBoot) }
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+            SwitchRow(
+                title = "H.265 video",
+                supporting = "Experimental; lower bitrate if the sender agrees. Reconnect after changing",
+                icon = Icons.Filled.Build,
+                checked = hevcEnabled,
+                onToggle = { onHevcEnabledChanged(!hevcEnabled) }
+            )
+            SwitchRow(
+                title = "Stream stats",
+                supporting = "FPS, bitrate, resolution and codec over the picture",
+                icon = Icons.Filled.Info,
+                checked = debugOverlayEnabled,
+                onToggle = { onDebugOverlayEnabledChanged(!debugOverlayEnabled) }
+            )
+        }
+    }
+
+    val deviceCard = @Composable {
+        SectionCard(title = "This receiver") {
+            SettingRow(
+                title = "Name",
+                supporting = serviceName,
+                icon = Icons.Filled.Edit,
+                onClick = { showNameDialog = true },
+                trailing = { TextButton(onClick = { showNameDialog = true }) { Text("Rename") } }
+            )
+            SettingRow(
+                title = "Restart receiver",
+                supporting = "Try this if it does not show up on your Mac or iPhone",
+                icon = Icons.Filled.Refresh,
+                onClick = onRestartServer,
+                trailing = { TextButton(onClick = onRestartServer) { Text("Restart") } }
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+            InfoRow("Display", "${displayInfo.width} × ${displayInfo.height} @ ${displayInfo.refreshRate} Hz (${displayInfo.aspectRatioLabel})")
+            InfoRow("AirPlay port", "7000")
+            InfoRow("Version", if (latestReleaseVersion != null) "v$appVersion (latest v$latestReleaseVersion)" else "v$appVersion")
+            Text(
+                text = "On a Mac: System Settings → Displays → $serviceName → \"Show all resolutions\" " +
+                    "offers ${displayInfo.recommendedResolutions}.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+            )
+        }
+    }
+
+    val connectionsCard = @Composable { modifier: Modifier ->
+        SectionCard(
+            title = "Recent connections",
+            modifier = modifier,
+            trailing = {
                 Text(
-                    text = "Mac / iPhone (Screen Mirroring) or Windows (Win + K) → $serviceName",
-                    fontSize = if (isTvOrCompact) 12.sp else if (isCompactScreen) 14.sp else 18.sp,
-                    color = Palette.TextSecondary
+                    "Last ${ConnectionHistory.MAX_ENTRIES}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = Palette.AccentContainerDark,
-                border = BorderStroke(1.dp, Palette.AccentContainer)
-            ) {
-                Row(
-                    modifier = Modifier.padding(
-                        horizontal = if (isTvOrCompact) 10.dp else 14.dp,
-                        vertical = if (isTvOrCompact) 4.dp else 8.dp
-                    ),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(if (isTvOrCompact) 6.dp else 8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(if (isTvOrCompact) 8.dp else 10.dp)
-                            .background(Palette.Accent, shape = CircleShape)
-                    )
-                    Text(
-                        text = if (status.startsWith("Visible")) "Ready to Connect" else status,
-                        fontSize = if (isTvOrCompact) 12.sp else 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Palette.Accent
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(if (isTvOrCompact) 4.dp else if (isCompactScreen) 12.dp else 28.dp))
-
-        val isPortraitLayout = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
-
-        val controlsCard = @Composable {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(if (isTvOrCompact) 12.dp else 16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, Palette.Border)
-            ) {
-                Column(modifier = Modifier.padding(cardPadding)) {
-                    Text(
-                        text = "Controls & Playback",
-                        fontSize = if (isTvOrCompact) 13.sp else if (isCompactScreen) 16.sp else 18.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Palette.Text
-                    )
-                    Spacer(modifier = Modifier.height(if (isTvOrCompact) 2.dp else if (isCompactScreen) 8.dp else 14.dp))
-
-                    // Row 0: Screen Orientation
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                horizontal = if (isTvOrCompact) 8.dp else 10.dp,
-                                vertical = if (isTvOrCompact) 1.dp else 6.dp
-                            ),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                            Text(
-                                text = "Screen Orientation",
-                                fontSize = if (isTvOrCompact) 12.sp else 15.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Palette.TextSecondary
-                            )
-                            Text(
-                                text = when (orientationSetting) {
-                                    ScreenOrientation.LANDSCAPE -> if (!isAutoSupported) "Landscape (wide)" else "Forced landscape (wide)"
-                                    ScreenOrientation.PORTRAIT -> if (!isAutoSupported) "Portrait (tall)" else "Forced portrait (tall)"
-                                    ScreenOrientation.AUTO -> "Auto-detect from tilt sensor"
-                                },
-                                fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                color = Palette.TextMuted
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            availableOrientations.forEach { option ->
-                                val isSelected = orientationSetting == option
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = if (isSelected) Palette.AccentContainer else Palette.Chip,
-                                    border = BorderStroke(1.dp, if (isSelected) Palette.Accent else Palette.Border),
-                                    modifier = Modifier
-                                        .tvFocusable(
-                                            shape = RoundedCornerShape(6.dp),
-                                            onClick = { onOrientationSettingChanged(option) }
-                                        )
-                                        .clickable { onOrientationSettingChanged(option) }
-                                ) {
-                                    Text(
-                                        text = option.label,
-                                        fontSize = if (isTvOrCompact) 9.sp else 11.sp,
-                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                        color = if (isSelected) Palette.Accent else Palette.TextMuted,
-                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(dividerSpacing))
-                    HorizontalDivider(color = Palette.Border, thickness = 0.5.dp)
-                    Spacer(modifier = Modifier.height(dividerSpacing))
-
-                    // Row 0b: Preferred Resolution
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                horizontal = if (isTvOrCompact) 8.dp else 10.dp,
-                                vertical = if (isTvOrCompact) 1.dp else 6.dp
-                            ),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                            Text(
-                                text = "Preferred Resolution",
-                                fontSize = if (isTvOrCompact) 12.sp else 15.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Palette.TextSecondary
-                            )
-                            Text(
-                                text = "Size offered to the sender; lower is lighter on Wi-Fi",
-                                fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                color = Palette.TextMuted
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        ResolutionPicker(
-                            selected = resolutionPreset,
-                            onSelected = onResolutionPresetChanged,
-                            fontSize = if (isTvOrCompact) 9.sp else 11.sp
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(dividerSpacing))
-                    HorizontalDivider(color = Palette.Border, thickness = 0.5.dp)
-                    Spacer(modifier = Modifier.height(dividerSpacing))
-
-                    // Row 1: Speaker Output
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .tvFocusable(
-                                shape = RoundedCornerShape(8.dp),
-                                onClick = { onAudioEnabledChanged(!audioEnabled) }
-                            )
-                            .padding(
-                                horizontal = if (isTvOrCompact) 8.dp else 10.dp,
-                                vertical = if (isTvOrCompact) 1.dp else 6.dp
-                            ),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Speaker Output",
-                                fontSize = if (isTvOrCompact) 12.sp else 15.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Palette.TextSecondary
-                            )
-                            Text(
-                                text = if (audioEnabled) "Play sound through device speakers" else "Device speakers muted",
-                                fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                color = Palette.TextMuted
-                            )
-                        }
-                        Switch(
-                            checked = audioEnabled,
-                            onCheckedChange = null,
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Palette.Background,
-                                checkedTrackColor = Palette.Accent,
-                                uncheckedThumbColor = Palette.TextMuted,
-                                uncheckedTrackColor = Palette.SurfaceVariant
-                            ),
-                            modifier = if (isTvOrCompact) Modifier.scale(0.8f) else Modifier
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(dividerSpacing))
-                    HorizontalDivider(color = Palette.Border, thickness = 0.5.dp)
-                    Spacer(modifier = Modifier.height(dividerSpacing))
-
-                    // Row 2: H.265 / HEVC Video (Experimental)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .tvFocusable(
-                                shape = RoundedCornerShape(8.dp),
-                                onClick = { onHevcEnabledChanged(!hevcEnabled) }
-                            )
-                            .padding(
-                                horizontal = if (isTvOrCompact) 8.dp else 10.dp,
-                                vertical = if (isTvOrCompact) 1.dp else 6.dp
-                            ),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "H.265 video (Experimental)",
-                                fontSize = if (isTvOrCompact) 12.sp else 15.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Palette.TextSecondary
-                            )
-                            Text(
-                                text = "Allow compatible senders to use H.265. Reconnect after changing. H.264 remains available.",
-                                fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                color = Palette.TextMuted
-                            )
-                        }
-                        Switch(
-                            checked = hevcEnabled,
-                            onCheckedChange = null,
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Palette.Background,
-                                checkedTrackColor = Palette.Accent,
-                                uncheckedThumbColor = Palette.TextMuted,
-                                uncheckedTrackColor = Palette.SurfaceVariant
-                            ),
-                            modifier = if (isTvOrCompact) Modifier.scale(0.8f) else Modifier
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(dividerSpacing))
-                    HorizontalDivider(color = Palette.Border, thickness = 0.5.dp)
-                    Spacer(modifier = Modifier.height(dividerSpacing))
-
-                    // Row 2b: Telemetry Overlay (Debug)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .tvFocusable(
-                                shape = RoundedCornerShape(8.dp),
-                                onClick = { onDebugOverlayEnabledChanged(!debugOverlayEnabled) }
-                            )
-                            .padding(
-                                horizontal = if (isTvOrCompact) 8.dp else 10.dp,
-                                vertical = if (isTvOrCompact) 1.dp else 6.dp
-                            ),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Telemetry Overlay (Debug)",
-                                fontSize = if (isTvOrCompact) 12.sp else 15.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Palette.TextSecondary
-                            )
-                            Text(
-                                text = "Display real-time stream stats (FPS, bitrate, resolution, codec) in top-left corner",
-                                fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                color = Palette.TextMuted
-                            )
-                        }
-                        Switch(
-                            checked = debugOverlayEnabled,
-                            onCheckedChange = null,
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Palette.Background,
-                                checkedTrackColor = Palette.Accent,
-                                uncheckedThumbColor = Palette.TextMuted,
-                                uncheckedTrackColor = Palette.SurfaceVariant
-                            ),
-                            modifier = if (isTvOrCompact) Modifier.scale(0.8f) else Modifier
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(dividerSpacing))
-                    HorizontalDivider(color = Palette.Border, thickness = 0.5.dp)
-                    Spacer(modifier = Modifier.height(dividerSpacing))
-
-                    // Row 3: Run in Background
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .tvFocusable(
-                                shape = RoundedCornerShape(8.dp),
-                                onClick = { onRunInBackgroundChanged(!runInBackground) }
-                            )
-                            .padding(
-                                horizontal = if (isTvOrCompact) 8.dp else 10.dp,
-                                vertical = if (isTvOrCompact) 1.dp else 6.dp
-                            ),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Run in Background",
-                                fontSize = if (isTvOrCompact) 12.sp else 15.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Palette.TextSecondary
-                            )
-                            Text(
-                                text = "Keep receiver discoverable when app is closed or minimized",
-                                fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                color = Palette.TextMuted
-                            )
-                        }
-                        Switch(
-                            checked = runInBackground,
-                            onCheckedChange = null,
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Palette.Background,
-                                checkedTrackColor = Palette.Accent,
-                                uncheckedThumbColor = Palette.TextMuted,
-                                uncheckedTrackColor = Palette.SurfaceVariant
-                            ),
-                            modifier = if (isTvOrCompact) Modifier.scale(0.8f) else Modifier
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(dividerSpacing))
-                    HorizontalDivider(color = Palette.Border, thickness = 0.5.dp)
-                    Spacer(modifier = Modifier.height(dividerSpacing))
-
-                    // Row 3b: Auto-open on connect
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .tvFocusable(
-                                shape = RoundedCornerShape(8.dp),
-                                onClick = if (!canAutoOpen) onRequestAutoOpen else null
-                            )
-                            .padding(
-                                horizontal = if (isTvOrCompact) 8.dp else 10.dp,
-                                vertical = if (isTvOrCompact) 1.dp else 6.dp
-                            ),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Auto-open on connect",
-                                fontSize = if (isTvOrCompact) 12.sp else 15.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = if (canAutoOpen) Palette.TextSecondary else Palette.Warning
-                            )
-                            Text(
-                                text = if (canAutoOpen)
-                                    "App brings itself to front when a device starts streaming"
-                                else
-                                    "Allow \"Display over other apps\" so the receiver can show the stream automatically",
-                                fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                color = Palette.TextMuted
-                            )
-                        }
-                        if (!canAutoOpen) {
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(1.dp, Palette.Warning),
-                                color = Palette.WarningContainer,
+        ) {
+            if (recentConnections.isEmpty()) {
+                Text(
+                    text = "Nothing yet. Sessions from your Mac, iPhone or iPad will show up here.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
+                )
+            } else {
+                recentConnections.forEach { entry ->
+                    val details = buildList {
+                        add(ConnectionHistory.formatTimestamp(entry.timestamp))
+                        if (entry.resolution.isNotBlank()) add(entry.resolution)
+                        if (entry.codec.isNotBlank()) add(entry.codec)
+                    }.joinToString(" · ")
+                    ListItem(
+                        headlineContent = { Text(entry.clientName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        supportingContent = { Text(details, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        leadingContent = {
+                            Box(
                                 modifier = Modifier
-                                    .clickable { onRequestAutoOpen() }
-                                    .padding(start = 8.dp)
+                                    .size(40.dp)
+                                    .background(MaterialTheme.colorScheme.tertiaryContainer, CircleShape),
+                                contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "Allow",
-                                    fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Palette.Warning,
-                                    modifier = Modifier.padding(
-                                        horizontal = if (isTvOrCompact) 8.dp else 12.dp,
-                                        vertical = if (isTvOrCompact) 3.dp else 6.dp
-                                    )
+                                    entry.clientName.take(1).uppercase(),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer
                                 )
                             }
-                        } else {
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = Palette.AccentContainerDark,
-                                border = BorderStroke(1.dp, Palette.AccentContainer),
-                                modifier = Modifier.padding(start = 8.dp)
-                            ) {
-                                Text(
-                                    text = "Enabled",
-                                    fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Palette.Accent,
-                                    modifier = Modifier.padding(
-                                        horizontal = if (isTvOrCompact) 8.dp else 12.dp,
-                                        vertical = if (isTvOrCompact) 3.dp else 6.dp
-                                    )
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(dividerSpacing))
-                    HorizontalDivider(color = Palette.Border, thickness = 0.5.dp)
-                    Spacer(modifier = Modifier.height(dividerSpacing))
-
-                    // Row 4: Start on Boot
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .tvFocusable(
-                                shape = RoundedCornerShape(8.dp),
-                                onClick = { onStartOnBootChanged(!startOnBoot) }
-                            )
-                            .padding(
-                                horizontal = if (isTvOrCompact) 8.dp else 10.dp,
-                                vertical = if (isTvOrCompact) 1.dp else 6.dp
-                            ),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
+                        },
+                        trailingContent = {
                             Text(
-                                text = "Start on Boot",
-                                fontSize = if (isTvOrCompact) 12.sp else 15.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Palette.TextSecondary
+                                ConnectionHistory.formatDuration(entry.durationSeconds),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary
                             )
-                            Text(
-                                text = if (isTvOrCompact) "Start receiver when device powers on" else "Automatically start receiver when device powers on",
-                                fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                color = Palette.TextMuted
-                            )
-                        }
-                        Switch(
-                            checked = startOnBoot,
-                            onCheckedChange = null,
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Palette.Background,
-                                checkedTrackColor = Palette.Accent,
-                                uncheckedThumbColor = Palette.TextMuted,
-                                uncheckedTrackColor = Palette.SurfaceVariant
-                            ),
-                            modifier = if (isTvOrCompact) Modifier.scale(0.8f) else Modifier
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(dividerSpacing))
-                    HorizontalDivider(color = Palette.Border, thickness = 0.5.dp)
-                    Spacer(modifier = Modifier.height(dividerSpacing))
-
-                    // Row 5: Bonjour Service Name
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .tvFocusable(
-                                shape = RoundedCornerShape(8.dp),
-                                onClick = { showNameDialog = true }
-                            )
-                            .padding(
-                                horizontal = if (isTvOrCompact) 8.dp else 10.dp,
-                                vertical = if (isTvOrCompact) 1.dp else 6.dp
-                            ),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Bonjour Service Name",
-                                fontSize = if (isTvOrCompact) 12.sp else 15.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Palette.TextSecondary
-                            )
-                            Text(
-                                text = "Advertised in Screen Mirroring as: \"$serviceName\"",
-                                fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                color = Palette.TextMuted
-                            )
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, Palette.Accent),
-                            color = Palette.AccentContainerDark
-                        ) {
-                            Text(
-                                text = "Rename",
-                                fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Palette.Accent,
-                                modifier = Modifier.padding(
-                                    horizontal = if (isTvOrCompact) 8.dp else 12.dp,
-                                    vertical = if (isTvOrCompact) 3.dp else 6.dp
-                                )
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(dividerSpacing))
-                    HorizontalDivider(color = Palette.Border, thickness = 0.5.dp)
-                    Spacer(modifier = Modifier.height(dividerSpacing))
-
-                    // Row 6: Receiver Service
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .tvFocusable(
-                                shape = RoundedCornerShape(8.dp),
-                                onClick = onRestartServer
-                            )
-                            .padding(
-                                horizontal = if (isTvOrCompact) 8.dp else 10.dp,
-                                vertical = if (isTvOrCompact) 1.dp else 6.dp
-                            ),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Receiver Service",
-                                fontSize = if (isTvOrCompact) 12.sp else 15.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Palette.TextSecondary
-                            )
-                            Text(
-                                text = "Restart if receiver does not appear on your device",
-                                fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                color = Palette.TextMuted
-                            )
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, Palette.AccentContainer),
-                            color = Palette.Chip
-                        ) {
-                            Text(
-                                text = "Restart",
-                                fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Palette.TextMuted,
-                                modifier = Modifier.padding(
-                                    horizontal = if (isTvOrCompact) 8.dp else 12.dp,
-                                    vertical = if (isTvOrCompact) 3.dp else 6.dp
-                                )
-                            )
-                        }
-                    }
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
                 }
             }
         }
+    }
 
-        val networkCard = @Composable {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .tvFocusable(
-                        shape = RoundedCornerShape(if (isTvOrCompact) 12.dp else 16.dp),
-                        unfocusedBorderColor = Palette.Border,
-                        borderWidth = 1.dp
-                    ),
-                shape = RoundedCornerShape(if (isTvOrCompact) 12.dp else 16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(modifier = Modifier.padding(cardPadding)) {
-                    Text(
-                        text = "Network & Diagnostics",
-                        fontSize = if (isTvOrCompact) 12.sp else if (isCompactScreen) 16.sp else 18.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Palette.Text
-                    )
-                    Spacer(modifier = Modifier.height(if (isTvOrCompact) 2.dp else if (isCompactScreen) 8.dp else 14.dp))
-                    val versionSummary = remember(appVersion, latestReleaseVersion) {
-                        if (latestReleaseVersion != null) {
-                            "v$appVersion (Latest: v$latestReleaseVersion)"
-                        } else {
-                            "v$appVersion"
-                        }
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
+        // The window extends into the cutout (edge to edge); keep content clear of the camera.
+        contentWindowInsets = WindowInsets.displayCutout,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text("Second Display", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                },
+                actions = {
+                    val releasesUrl = "https://github.com/swide-git/second-display/releases/latest"
+                    val openReleases = {
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(releasesUrl))) }
+                        Unit
                     }
-                    if (isTvOrCompact) {
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                InfoRow(label = "Wi-Fi", value = networkDetails.wifiSsid, fontSize = 11.sp)
-                                Spacer(modifier = Modifier.height(1.dp))
-                                InfoRow(label = "Services", value = "$serviceName (7000/7250)", fontSize = 11.sp)
-                                Spacer(modifier = Modifier.height(1.dp))
-                                InfoRow(label = "Version", value = versionSummary, fontSize = 11.sp)
-                            }
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                InfoRow(label = "Device IP", value = networkDetails.ipAddress, fontSize = 11.sp)
-                                Spacer(modifier = Modifier.height(1.dp))
-                                InfoRow(label = "Display", value = "${displayInfo.width}×${displayInfo.height}@${displayInfo.refreshRate}Hz", fontSize = 11.sp)
-                            }
-                        }
+                    if (hasNewerRelease) {
+                        FilledTonalButton(onClick = openReleases) { Text("Update to v$latestReleaseVersion") }
                     } else {
-                        InfoRow(label = "Wi-Fi Network", value = networkDetails.wifiSsid)
-                        Spacer(modifier = Modifier.height(if (isCompactScreen) 4.dp else 8.dp))
-                        InfoRow(label = "Device IP", value = networkDetails.ipAddress)
-                        Spacer(modifier = Modifier.height(if (isCompactScreen) 4.dp else 8.dp))
-                        InfoRow(label = "Receiver Services", value = "$serviceName (AirPlay 7000 • Miracast 7250)")
-                        Spacer(modifier = Modifier.height(if (isCompactScreen) 4.dp else 8.dp))
-                        InfoRow(label = "Display", value = "${displayInfo.width} × ${displayInfo.height} @ ${displayInfo.refreshRate}Hz (Auto-fit)")
-                        Spacer(modifier = Modifier.height(if (isCompactScreen) 4.dp else 8.dp))
-                        InfoRow(label = "App Version", value = versionSummary)
+                        TextButton(onClick = openReleases) { Text("v$appVersion") }
                     }
-                }
-            }
+                    Spacer(modifier = Modifier.width(8.dp))
+                },
+                windowInsets = WindowInsets.displayCutout,
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+            )
         }
-
-        val resolutionsCard = @Composable {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .tvFocusable(
-                        shape = RoundedCornerShape(if (isTvOrCompact) 12.dp else 16.dp),
-                        unfocusedBorderColor = Palette.Border,
-                        borderWidth = 1.dp
-                    ),
-                shape = RoundedCornerShape(if (isTvOrCompact) 12.dp else 16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(modifier = Modifier.padding(cardPadding)) {
-                    Text(
-                        text = "Preferred Resolutions (${displayInfo.aspectRatioLabel})",
-                        fontSize = if (isTvOrCompact) 12.sp else if (isCompactScreen) 16.sp else 18.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Palette.Text
-                    )
-                    Spacer(modifier = Modifier.height(if (isTvOrCompact) 2.dp else if (isCompactScreen) 6.dp else 12.dp))
-                    Text(
-                        text = displayInfo.recommendedResolutions,
-                        fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Medium,
-                        color = Palette.Accent
-                    )
-                    Spacer(modifier = Modifier.height(if (isTvOrCompact) 1.dp else if (isCompactScreen) 4.dp else 8.dp))
-                    Text(
-                        text = if (isTvOrCompact)
-                            "In macOS Settings → Displays, select $serviceName and toggle \"Show all resolutions\"."
-                        else
-                            "In macOS System Settings → Displays, select $serviceName and toggle \"Show all resolutions\" to pick from these ${displayInfo.aspectRatioLabel} modes (both Extended & Mirroring supported).",
-                        fontSize = if (isTvOrCompact) 10.sp else 12.sp,
-                        color = Palette.TextMuted,
-                        lineHeight = if (isTvOrCompact) 12.sp else 16.sp
-                    )
-                }
-            }
-        }
-
-        val connectionsCard = @Composable { isFillMaxHeight: Boolean, modifier: Modifier ->
-            Card(
-                modifier = modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(if (isTvOrCompact) 12.dp else 16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, Palette.Border)
-            ) {
-                val contentModifier = if (isFillMaxHeight) {
-                    Modifier
-                        .padding(if (isTvOrCompact) 10.dp else if (isCompactScreen) 16.dp else 20.dp)
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                } else {
-                    Modifier
-                        .padding(if (isTvOrCompact) 10.dp else if (isCompactScreen) 16.dp else 20.dp)
-                        .fillMaxWidth()
-                }
-                Column(modifier = contentModifier) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Recent Connections",
-                            fontSize = if (isTvOrCompact) 14.sp else 18.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Palette.Text
-                        )
-                        Text(
-                            text = "Last ${ConnectionHistory.MAX_ENTRIES} sessions",
-                            fontSize = if (isTvOrCompact) 11.sp else 13.sp,
-                            color = Palette.TextMuted
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(if (isTvOrCompact) 6.dp else 16.dp))
-
-                    if (recentConnections.isEmpty()) {
-                        val boxModifier = if (isFillMaxHeight) Modifier.fillMaxWidth().weight(1f) else Modifier.fillMaxWidth().padding(vertical = 24.dp)
-                        Box(
-                            modifier = boxModifier,
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = "No recent connections",
-                                    fontSize = if (isTvOrCompact) 13.sp else 16.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Palette.TextMuted
-                                )
-                                Spacer(modifier = Modifier.height(if (isTvOrCompact) 3.dp else 6.dp))
-                                Text(
-                                    text = "Mirrored sessions from iPhone, iPad, or Mac will appear here.",
-                                    fontSize = if (isTvOrCompact) 11.sp else 13.sp,
-                                    color = Palette.TextFaint
-                                )
-                            }
-                        }
-                    } else {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(if (isTvOrCompact) 4.dp else 10.dp)
-                        ) {
-                            recentConnections.forEach { entry ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .tvFocusable(
-                                            shape = RoundedCornerShape(if (isTvOrCompact) 8.dp else 10.dp),
-                                            unfocusedBackgroundColor = Palette.SurfaceVariant
-                                        )
-                                        .padding(
-                                            horizontal = if (isTvOrCompact) 10.dp else 16.dp,
-                                            vertical = if (isTvOrCompact) 4.dp else 12.dp
-                                        ),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = entry.clientName,
-                                            fontSize = if (isTvOrCompact) 12.sp else 15.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Palette.Text
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        val details = buildList {
-                                            add(ConnectionHistory.formatTimestamp(entry.timestamp))
-                                            if (entry.resolution.isNotBlank()) add(entry.resolution)
-                                            if (entry.codec.isNotBlank()) add(entry.codec)
-                                        }.joinToString(" • ")
-                                        Text(
-                                            text = details,
-                                            fontSize = if (isTvOrCompact) 10.sp else 13.sp,
-                                            color = Palette.TextMuted
-                                        )
-                                    }
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = Palette.Surface
-                                    ) {
-                                        Text(
-                                            text = ConnectionHistory.formatDuration(entry.durationSeconds),
-                                            fontSize = if (isTvOrCompact) 10.sp else 13.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = Palette.Accent,
-                                            modifier = Modifier.padding(
-                                                horizontal = if (isTvOrCompact) 8.dp else 10.dp,
-                                                vertical = if (isTvOrCompact) 3.dp else 5.dp
-                                            )
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if (isPortraitLayout) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(cardSpacing)
-            ) {
-                controlsCard()
-                networkCard()
-                resolutionsCard()
-                connectionsCard(false, Modifier)
-            }
-        } else {
+    ) { padding ->
+        val contentPadding = Modifier
+            .padding(padding)
+            .padding(horizontal = if (wide) 24.dp else 16.dp)
+        if (wide) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(columnSpacing)
+                modifier = contentPadding.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(cardSpacing)
+                    modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    controlsCard()
-                    networkCard()
-                    resolutionsCard()
+                    statusCard()
+                    pickers()
+                    connectionsCard(Modifier)
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
-                connectionsCard(true, Modifier.weight(1f).fillMaxHeight())
+                Column(
+                    modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    settingsCard()
+                    deviceCard()
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+        } else {
+            Column(
+                modifier = contentPadding.fillMaxSize().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                statusCard()
+                pickers()
+                settingsCard()
+                connectionsCard(Modifier)
+                deviceCard()
+                Spacer(modifier = Modifier.height(8.dp))
             }
         }
     }
@@ -1481,44 +1046,26 @@ private fun DashboardScreen(
         var tempName by remember { mutableStateOf(serviceName) }
         AlertDialog(
             onDismissRequest = { showNameDialog = false },
-            containerColor = Palette.Surface,
-            title = {
-                Text(
-                    text = "Change Bonjour Name",
-                    fontSize = if (isTvOrCompact) 16.sp else 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Palette.Text
-                )
-            },
+            icon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+            title = { Text("Receiver name") },
             text = {
                 Column {
                     Text(
-                        text = "Customize the name shown in Screen Mirroring on macOS and iOS. Useful if you have multiple displays on the same Wi-Fi network.",
-                        fontSize = if (isTvOrCompact) 12.sp else 14.sp,
-                        color = Palette.TextMuted,
-                        lineHeight = if (isTvOrCompact) 16.sp else 20.sp
+                        text = "The name shown in Screen Mirroring on your Mac, iPhone and iPad. " +
+                            "Useful with several receivers on one network.",
+                        style = MaterialTheme.typography.bodyMedium
                     )
-                    Spacer(modifier = Modifier.height(if (isTvOrCompact) 10.dp else 16.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                     OutlinedTextField(
                         value = tempName,
                         onValueChange = { if (it.length <= 60) tempName = it },
-                        label = { Text("Display Name") },
+                        label = { Text("Name") },
                         singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Palette.Text,
-                            unfocusedTextColor = Palette.TextSecondary,
-                            focusedBorderColor = Palette.Accent,
-                            unfocusedBorderColor = Palette.Border,
-                            focusedLabelColor = Palette.Accent,
-                            unfocusedLabelColor = Palette.TextMuted
-                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
             },
             confirmButton = {
-                val saveInteraction = remember { MutableInteractionSource() }
-                val isSaveFocused by saveInteraction.collectIsFocusedAsState()
                 Button(
                     onClick = {
                         val trimmed = tempName.trim()
@@ -1527,65 +1074,18 @@ private fun DashboardScreen(
                         }
                         showNameDialog = false
                     },
-                    interactionSource = saveInteraction,
-                    enabled = tempName.trim().isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isSaveFocused) Palette.AccentFocused else Palette.Accent,
-                        contentColor = Palette.Background
-                    ),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.border(
-                        if (isSaveFocused) 2.dp else 0.dp,
-                        Color.White,
-                        RoundedCornerShape(10.dp)
-                    )
-                ) {
-                    Text("Save & Apply")
-                }
+                    enabled = tempName.trim().isNotBlank()
+                ) { Text("Save") }
             },
             dismissButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (serviceName != WormholeIdentity.DEFAULT_SERVICE_NAME) {
-                        val resetInteraction = remember { MutableInteractionSource() }
-                        val isResetFocused by resetInteraction.collectIsFocusedAsState()
-                        TextButton(
-                            onClick = {
-                                onServiceNameChanged(WormholeIdentity.DEFAULT_SERVICE_NAME)
-                                showNameDialog = false
-                            },
-                            interactionSource = resetInteraction,
-                            modifier = Modifier
-                                .background(
-                                    if (isResetFocused) Palette.BorderStrong else Color.Transparent,
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .border(
-                                    if (isResetFocused) 1.5.dp else 0.dp,
-                                    Palette.Accent,
-                                    RoundedCornerShape(8.dp)
-                                )
-                        ) {
-                            Text("Reset", color = if (isResetFocused) Color.White else Palette.TextMuted)
-                        }
+                        TextButton(onClick = {
+                            onServiceNameChanged(WormholeIdentity.DEFAULT_SERVICE_NAME)
+                            showNameDialog = false
+                        }) { Text("Reset") }
                     }
-                    val cancelInteraction = remember { MutableInteractionSource() }
-                    val isCancelFocused by cancelInteraction.collectIsFocusedAsState()
-                    TextButton(
-                        onClick = { showNameDialog = false },
-                        interactionSource = cancelInteraction,
-                        modifier = Modifier
-                            .background(
-                                if (isCancelFocused) Palette.BorderStrong else Color.Transparent,
-                                RoundedCornerShape(8.dp)
-                            )
-                            .border(
-                                if (isCancelFocused) 1.5.dp else 0.dp,
-                                Palette.Accent,
-                                RoundedCornerShape(8.dp)
-                            )
-                    ) {
-                        Text("Cancel", color = if (isCancelFocused) Color.White else Palette.TextMuted)
-                    }
+                    TextButton(onClick = { showNameDialog = false }) { Text("Cancel") }
                 }
             }
         )
@@ -1600,6 +1100,7 @@ private fun NowPlayingScreen(
     debugOverlayEnabled: Boolean
 ) {
     val configuration = LocalConfiguration.current
+    val colors = MaterialTheme.colorScheme
     val isPortraitLayout = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
     val isCompact = configuration.screenHeightDp <= 650 && !isPortraitLayout
     val outerPadding = if (isCompact) 28.dp else 48.dp
@@ -1619,8 +1120,8 @@ private fun NowPlayingScreen(
         val image = remember(artwork) { artwork?.asImageBitmap() }
         Box(
             modifier = modifier
-                .clip(RoundedCornerShape(16.dp))
-                .background(Palette.SurfaceVariant),
+                .clip(RoundedCornerShape(32.dp))
+                .background(colors.secondaryContainer),
             contentAlignment = Alignment.Center
         ) {
             if (image != null) {
@@ -1631,7 +1132,7 @@ private fun NowPlayingScreen(
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
-                Text(text = "♪", fontSize = 96.sp, color = Palette.Accent)
+                Text(text = "♪", fontSize = 96.sp, color = colors.onSecondaryContainer)
             }
         }
     }
@@ -1644,21 +1145,18 @@ private fun NowPlayingScreen(
         ) {
             Text(
                 text = nowPlaying.title.ifBlank { "AirPlay audio" },
-                fontSize = if (isCompact) 26.sp else 34.sp,
+                style = if (isCompact) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.displaySmall,
                 fontWeight = FontWeight.Bold,
-                color = Palette.Text,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                textAlign = textAlign,
-                lineHeight = if (isCompact) 30.sp else 40.sp
+                textAlign = textAlign
             )
             if (nowPlaying.artist.isNotBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = nowPlaying.artist,
-                    fontSize = if (isCompact) 18.sp else 22.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Palette.Accent,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = colors.primary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     textAlign = textAlign
@@ -1672,8 +1170,8 @@ private fun NowPlayingScreen(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = albumLine,
-                    fontSize = if (isCompact) 14.sp else 17.sp,
-                    color = Palette.TextMuted,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     textAlign = textAlign
@@ -1684,34 +1182,29 @@ private fun NowPlayingScreen(
                 Spacer(modifier = Modifier.height(if (isCompact) 16.dp else 28.dp))
                 LinearProgressIndicator(
                     progress = { (position / nowPlaying.durationSec).toFloat() },
-                    modifier = Modifier.fillMaxWidth().height(6.dp),
-                    color = Palette.Accent,
-                    trackColor = Palette.Border
+                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape)
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(
                         text = NowPlaying.formatTime(position),
-                        fontSize = 13.sp,
+                        style = MaterialTheme.typography.labelMedium,
                         fontFamily = FontFamily.Monospace,
-                        color = Palette.TextMuted
+                        color = colors.onSurfaceVariant
                     )
                     Text(
                         text = "-" + NowPlaying.formatTime(nowPlaying.durationSec - position),
-                        fontSize = 13.sp,
+                        style = MaterialTheme.typography.labelMedium,
                         fontFamily = FontFamily.Monospace,
-                        color = Palette.TextMuted
+                        color = colors.onSurfaceVariant
                     )
                 }
             }
             Spacer(modifier = Modifier.height(if (isCompact) 14.dp else 24.dp))
-            Text(
-                text = "Playing from ${clientName ?: "AirPlay"}",
-                fontSize = if (isCompact) 12.sp else 14.sp,
-                color = Palette.TextFaint,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = textAlign
+            AssistChip(
+                onClick = {},
+                label = { Text("Playing from ${clientName ?: "AirPlay"}", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                leadingIcon = { Icon(AppIcons.Cast, contentDescription = null, modifier = Modifier.size(18.dp)) }
             )
         }
     }
@@ -1719,7 +1212,7 @@ private fun NowPlayingScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Palette.Surface, Palette.Background)))
+            .background(Brush.verticalGradient(listOf(colors.surfaceContainerHigh, colors.surface)))
     ) {
         if (isPortraitLayout) {
             Column(
@@ -1752,6 +1245,7 @@ private fun NowPlayingScreen(
     }
 }
 
+/** Stream stats over the picture; fixed dark colours because it sits on top of video. */
 @Composable
 private fun TelemetryOverlay(
     telemetry: StreamTelemetry,
@@ -1766,108 +1260,71 @@ private fun TelemetryOverlay(
         }
     }
 
+    val accent = MaterialTheme.colorScheme.primary
     Surface(
         modifier = modifier.wrapContentSize(),
-        shape = RoundedCornerShape(8.dp),
-        color = Palette.BackgroundScrim,
-        border = BorderStroke(1.dp, Palette.AccentTranslucent)
+        shape = RoundedCornerShape(12.dp),
+        color = Palette.OverlayScrim
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
-            // Video row
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .background(Palette.Accent, shape = CircleShape)
+            val codecShort = if (snapshot.codecName.isNotBlank()) {
+                " (" + snapshot.codecName.removePrefix("OMX.qcom.video.decoder.").removePrefix("OMX.google.") + ")"
+            } else ""
+            TelemetryLine(
+                tag = "VIDEO",
+                active = true,
+                accent = accent,
+                text = String.format(
+                    java.util.Locale.US,
+                    "%.1f fps • %s • %s%s",
+                    snapshot.fps,
+                    snapshot.formattedThroughput,
+                    snapshot.formattedResolution,
+                    codecShort
                 )
-                Text(
-                    text = "VIDEO",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.5.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = Palette.Accent
-                )
-                val codecShort = if (snapshot.codecName.isNotBlank()) {
-                    " (" + snapshot.codecName.removePrefix("OMX.qcom.video.decoder.").removePrefix("OMX.google.") + ")"
-                } else ""
-                Text(
-                    text = String.format(
-                        java.util.Locale.US,
-                        "%.1f fps • %s • %s%s",
-                        snapshot.fps,
-                        snapshot.formattedThroughput,
-                        snapshot.formattedResolution,
-                        codecShort
-                    ),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    fontFamily = FontFamily.Monospace,
-                    color = Palette.Text
-                )
-            }
-
-            // Audio row
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                val audioActive = snapshot.audioActive && snapshot.audioEnabled
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .background(if (audioActive) Palette.Accent else Palette.TextFaint, shape = CircleShape)
-                )
-                Text(
-                    text = "AUDIO",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.5.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = if (audioActive) Palette.Accent else Palette.TextMuted
-                )
-                val audioText = if (snapshot.audioEnabled) {
+            )
+            TelemetryLine(
+                tag = "AUDIO",
+                active = snapshot.audioActive && snapshot.audioEnabled,
+                accent = accent,
+                text = if (snapshot.audioEnabled) {
                     "${snapshot.audioCodec} • Vol ${snapshot.formattedAudioVolume} • ${snapshot.formattedAudioStatus}"
                 } else {
                     "Disabled / Muted"
                 }
-                Text(
-                    text = audioText,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    fontFamily = FontFamily.Monospace,
-                    color = Palette.TextSecondary
-                )
-            }
-
-            // Frames row
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Box(modifier = Modifier.size(6.dp))
-                Text(
-                    text = "SYNC ",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.5.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = Palette.TextFaint
-                )
-                Text(
-                    text = "${snapshot.totalFramesRendered} video frames • ${snapshot.audioFramesPlayed} audio frames",
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = Palette.TextMuted
-                )
-            }
+            )
+            TelemetryLine(
+                tag = "SYNC ",
+                active = false,
+                accent = accent,
+                text = "${snapshot.totalFramesRendered} video frames • ${snapshot.audioFramesPlayed} audio frames"
+            )
         }
+    }
+}
+
+@Composable
+private fun TelemetryLine(tag: String, active: Boolean, accent: Color, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(modifier = Modifier.size(6.dp).background(if (active) accent else Palette.OverlayMuted, CircleShape))
+        Text(
+            text = tag,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.5.sp,
+            fontFamily = FontFamily.Monospace,
+            color = if (active) accent else Palette.OverlayMuted
+        )
+        Text(
+            text = text,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            fontFamily = FontFamily.Monospace,
+            color = Palette.OverlayText
+        )
     }
 }
 
@@ -1887,136 +1344,42 @@ private fun OrientationNoticeDialog(
         onDismiss()
     }
 
-    val mode = if (notice.isPortrait) "Portrait" else "Landscape"
+    val mode = if (notice.isPortrait) "portrait" else "landscape"
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Palette.Surface,
-        shape = RoundedCornerShape(16.dp),
-        title = {
-            Text(
-                text = if (notice.resolutionChange) "Resolution Changed" else "Display Rotated",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = Palette.Text
-            )
-        },
+        icon = { Icon(Icons.Filled.Refresh, contentDescription = null) },
+        title = { Text(if (notice.resolutionChange) "Resolution changed" else "Display rotated") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = if (notice.resolutionChange) "Advertised resolution changed to ${notice.width} × ${notice.height}."
-                           else "Display orientation changed to $mode (${notice.width} × ${notice.height}).",
-                    fontSize = 14.sp,
-                    color = Palette.Text,
-                    fontWeight = FontWeight.Medium
+                    text = if (notice.resolutionChange) "The receiver now offers ${notice.width} × ${notice.height}."
+                           else "The display is now $mode (${notice.width} × ${notice.height}).",
+                    style = MaterialTheme.typography.bodyLarge
                 )
                 Text(
-                    text = "AirPlay streaming was disconnected because Apple devices do not adapt to geometry changes mid-stream. Reconnect from Screen Mirroring on your Mac or iPhone to resume.",
-                    fontSize = 13.sp,
-                    color = Palette.TextMuted,
-                    lineHeight = 18.sp
+                    text = "The sender was disconnected because Apple devices do not follow geometry changes " +
+                        "mid-stream. Choose this receiver in Screen Mirroring again to continue.",
+                    style = MaterialTheme.typography.bodyMedium
                 )
             }
         },
         confirmButton = {
-            val okInteraction = remember { MutableInteractionSource() }
-            val isOkFocused by okInteraction.collectIsFocusedAsState()
-            Button(
-                onClick = onDismiss,
-                interactionSource = okInteraction,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isOkFocused) Palette.AccentFocused else Palette.Accent,
-                    contentColor = Palette.Background
-                ),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.border(
-                    if (isOkFocused) 2.dp else 0.dp,
-                    Color.White,
-                    RoundedCornerShape(10.dp)
-                )
-            ) {
-                Text("OK (${remainingSeconds}s)", fontWeight = FontWeight.SemiBold)
-            }
+            Button(onClick = onDismiss) { Text("OK (${remainingSeconds}s)") }
         }
     )
 }
 
-
-@Composable
-private fun ResolutionPicker(selected: ResolutionPreset, onSelected: (ResolutionPreset) -> Unit, fontSize: TextUnit) {
-    var expanded by remember { mutableStateOf(false) }
-    val available = WormholeServer.availableResolutionPresets()
-    // A preset that does not fit this panel is not applied; show what is actually advertised.
-    val effective = if (selected in available) selected else ResolutionPreset.NATIVE
-    Box {
-        Surface(
-            shape = RoundedCornerShape(6.dp),
-            color = Palette.AccentContainer,
-            border = BorderStroke(1.dp, Palette.Accent),
-            modifier = Modifier
-                .tvFocusable(shape = RoundedCornerShape(6.dp), onClick = { expanded = true })
-                .clickable { expanded = true }
-        ) {
-            Text(
-                text = "${WormholeServer.resolutionLabel(effective)}  ▾",
-                fontSize = fontSize,
-                fontWeight = FontWeight.SemiBold,
-                color = Palette.Accent,
-                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
-            )
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            containerColor = Palette.Surface
-        ) {
-            available.forEach { preset ->
-                val isSelected = preset == effective
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = WormholeServer.resolutionLabel(preset),
-                            fontSize = 14.sp,
-                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                            color = if (isSelected) Palette.Accent else Palette.TextSecondary
-                        )
-                    },
-                    onClick = {
-                        expanded = false
-                        onSelected(preset)
-                    }
-                )
-            }
-        }
-    }
-}
-
 @Composable
 private fun MirrorSettingRow(title: String, subtitle: String, checked: Boolean, onToggle: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .tvFocusable(shape = RoundedCornerShape(8.dp), onClick = onToggle)
-            .clickable { onToggle() }
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-            Text(text = title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Palette.TextSecondary)
-            Text(text = subtitle, fontSize = 12.sp, color = Palette.TextMuted)
-        }
-        Switch(
-            checked = checked,
-            onCheckedChange = null,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Palette.Background,
-                checkedTrackColor = Palette.Accent,
-                uncheckedThumbColor = Palette.TextMuted,
-                uncheckedTrackColor = Palette.SurfaceVariant
-            )
-        )
-    }
+    val shape = RoundedCornerShape(12.dp)
+    ListItem(
+        headlineContent = { Text(title) },
+        supportingContent = { Text(subtitle) },
+        trailingContent = { Switch(checked = checked, onCheckedChange = null) },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier.clip(shape).focusRing(shape).clickable(onClick = onToggle)
+    )
 }
 
 /** Opened by a long press on the mirror. Live toggles apply at once; the rest end the session. */
@@ -2033,49 +1396,53 @@ private fun MirrorSettingsDialog(
     onDisconnect: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    var resolutionMenu by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Palette.Surface,
-        shape = RoundedCornerShape(16.dp),
-        title = {
-            Text(text = "Settings", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.Text)
-        },
+        icon = { Icon(Icons.Filled.Settings, contentDescription = null) },
+        title = { Text("Settings") },
         text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(text = "Applies now", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.Accent)
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    "Applies now",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
                 MirrorSettingRow(
-                    title = "Stream Stats",
-                    subtitle = "FPS, bitrate, resolution and codec overlay",
+                    title = "Stream stats",
+                    subtitle = "FPS, bitrate, resolution and codec",
                     checked = debugOverlayEnabled,
                     onToggle = { onDebugOverlayEnabledChanged(!debugOverlayEnabled) }
                 )
                 MirrorSettingRow(
-                    title = "Speaker Output",
-                    subtitle = if (audioEnabled) "Play sound through device speakers" else "Device speakers muted",
+                    title = "Speaker",
+                    subtitle = if (audioEnabled) "Sound plays on this device" else "Muted on this device",
                     checked = audioEnabled,
                     onToggle = { onAudioEnabledChanged(!audioEnabled) }
                 )
-                HorizontalDivider(color = Palette.Border, thickness = 0.5.dp)
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 Text(
-                    text = "Ends this session; reconnect from Screen Mirroring",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Palette.WarningBright
+                    "Ends this session; reconnect from Screen Mirroring",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(bottom = 4.dp)
                 )
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(text = "Preferred Resolution", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Palette.TextSecondary)
-                    Text(
-                        text = "Size offered to the sender; lower is lighter on Wi-Fi",
-                        fontSize = 12.sp,
-                        color = Palette.TextMuted
+                Box {
+                    ListItem(
+                        headlineContent = { Text("Resolution") },
+                        supportingContent = { Text(WormholeServer.resolutionLabel(resolutionPreset)) },
+                        trailingContent = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .focusRing(RoundedCornerShape(12.dp))
+                            .clickable { resolutionMenu = true }
                     )
-                    ResolutionPicker(selected = resolutionPreset, onSelected = onResolutionPresetChanged, fontSize = 12.sp)
+                    ResolutionMenu(resolutionPreset, resolutionMenu, { resolutionMenu = false }, onResolutionPresetChanged)
                 }
                 MirrorSettingRow(
-                    title = "H.265 / HEVC Video",
+                    title = "H.265 video",
                     subtitle = "Lower bitrate when the sender agrees to use it",
                     checked = hevcEnabled,
                     onToggle = { onHevcEnabledChanged(!hevcEnabled) }
@@ -2083,13 +1450,13 @@ private fun MirrorSettingsDialog(
             }
         },
         confirmButton = {
-            Button(
-                onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = Palette.Accent, contentColor = Palette.Background)
-            ) { Text("Close") }
+            Button(onClick = onDismiss) { Text("Close") }
         },
         dismissButton = {
-            TextButton(onClick = onDisconnect) { Text("Disconnect", color = Palette.Error) }
+            TextButton(
+                onClick = onDisconnect,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+            ) { Text("Disconnect") }
         }
     )
 }

@@ -19,7 +19,6 @@ marked "Android JNI addition").
 | `global.h` / `mdnsd/dnssd_mdnsd.c` | Advertise an AirPort-Express `am=` on the RAOP record (audio auth selection) while `_airplay` keeps `AppleTV3,2`. |
 | `rsakey.c` / `rsakey.h` (new) | AirPort Express RSA key: Apple-Challenge signing (PKCS#1 v1.5) and rsaaeskey decryption (RSA-OAEP), plus padding-tolerant base64. |
 | `mdnsd/dnssd_mdnsd.c` | Build a unique mDNS hostname from `hwaddr` instead of `gethostname()`, which returns "localhost" on Android and caused LAN collisions and misrouted connections across multiple receivers. |
-| `mdnsd/mdnsd.h`, `mdnsd/mdnsd.c`, `mdnsd/dnssd_mdnsd.c` | Advertise `_display._tcp.local` (port 7250, TXT `container_id` and `p2pMAC`) alongside `_airplay._tcp.local` for Miracast over Infrastructure (MS-MICE) discovery from Windows 10/11 and Linux (GNOME Network Displays). |
 
 These are deliberate correctness changes. No upstream-version claim is made;
 reconcile each with upstream during the next controlled vendor update. The UxPlay

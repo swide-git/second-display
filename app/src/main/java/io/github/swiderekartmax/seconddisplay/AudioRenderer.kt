@@ -232,18 +232,11 @@ class AudioRenderer(private val telemetry: StreamTelemetry? = null) {
     private fun createAacDecoder(ct: Int = NativeBridge.CT_AAC_ELD): MediaCodec? {
         return try {
             val codec = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
-            val isWfdAac = ct == NativeBridge.CT_WFD_AAC_48K
-            val rate = if (isWfdAac) SAMPLE_RATE_WFD else SAMPLE_RATE
+            val rate = SAMPLE_RATE
             val format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, rate, 2).apply {
-                if (isWfdAac) {
-                    setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC)
-                    setInteger(MediaFormat.KEY_IS_ADTS, 0)
-                    setByteBuffer("csd-0", ByteBuffer.wrap(CSD_AAC_LC_48000_STEREO))
-                } else {
-                    setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectELD)
-                    setInteger(MediaFormat.KEY_IS_ADTS, 0)
-                    setByteBuffer("csd-0", ByteBuffer.wrap(CSD_AAC_ELD_44100_STEREO_480))
-                }
+                setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectELD)
+                setInteger(MediaFormat.KEY_IS_ADTS, 0)
+                setByteBuffer("csd-0", ByteBuffer.wrap(CSD_AAC_ELD_44100_STEREO_480))
             }
             codec.configure(format, null, null, 0)
             codec.start()
@@ -256,24 +249,20 @@ class AudioRenderer(private val telemetry: StreamTelemetry? = null) {
         }
     }
 
-    private fun isPcmCt(ct: Int): Boolean =
-        ct == NativeBridge.CT_PCM || ct == NativeBridge.CT_WFD_LPCM_48K
-
-    private fun sampleRateForCt(ct: Int): Int =
-        if (ct == NativeBridge.CT_WFD_LPCM_48K || ct == NativeBridge.CT_WFD_AAC_48K) SAMPLE_RATE_WFD else SAMPLE_RATE
+    private fun isPcmCt(ct: Int): Boolean = ct == NativeBridge.CT_PCM
 
     private fun tick() {
         val isActive = synchronized(stateLock) { active && !closed }
         if (!isActive) return
         var currentTrack = audioTrack ?: return
 
-        // PCM packets (decoded ALAC or Miracast LPCM) are written straight to the track, paced by their
+        // PCM packets (decoded ALAC) are written straight to the track, paced by their
         // presentation time; several may fall due in one tick after a sender burst.
         var pcmBudget = MAX_PCM_WRITES_PER_TICK
         while (pcmBudget-- > 0) {
             val head = synchronized(stateLock) { frameQueue.peekFirst() } ?: break
             if (!isPcmCt(head.ct)) break
-            currentTrack = ensureTrackSampleRate(sampleRateForCt(head.ct)) ?: return
+            currentTrack = ensureTrackSampleRate(SAMPLE_RATE) ?: return
             if (!pcmDue(head, currentTrack)) break
             synchronized(stateLock) { frameQueue.pollFirst() }
             writePcm(head, currentTrack)
@@ -284,7 +273,7 @@ class AudioRenderer(private val telemetry: StreamTelemetry? = null) {
             if (first == null || isPcmCt(first.ct)) null else frameQueue.pollFirst()
         }
         if (packet != null) {
-            currentTrack = ensureTrackSampleRate(sampleRateForCt(packet.ct)) ?: return
+            currentTrack = ensureTrackSampleRate(SAMPLE_RATE) ?: return
             if (decoder == null || decoderCt != packet.ct) {
                 runCatching {
                     decoder?.stop()
@@ -377,7 +366,7 @@ class AudioRenderer(private val telemetry: StreamTelemetry? = null) {
         val nowNs = System.currentTimeMillis() * 1_000_000L
         val played = track.playbackHeadPosition.toLong() and 0xffffffffL
         val queuedFrames = (pcmFramesWritten - played).coerceAtLeast(0L)
-        val playAtNs = nowNs + queuedFrames * 1_000_000_000L / sampleRateForCt(packet.ct)
+        val playAtNs = nowNs + queuedFrames * 1_000_000_000L / SAMPLE_RATE
         val lead = ntp - playAtNs
         if (lead > PCM_MAX_PLAUSIBLE_LEAD_NS) return true   // clock disagreement; do not stall
         return lead <= PCM_EARLY_NS
@@ -410,7 +399,6 @@ class AudioRenderer(private val telemetry: StreamTelemetry? = null) {
     internal companion object {
         const val TAG = "WormholeAudio"
         const val SAMPLE_RATE = 44100
-        const val SAMPLE_RATE_WFD = 48000
         const val MAX_QUEUE_SIZE = 30
         /** ~4 s of 352-frame ALAC packets: audio-only senders run about 2 s ahead. */
         const val MAX_PCM_QUEUE_SIZE = 512
@@ -434,12 +422,6 @@ class AudioRenderer(private val telemetry: StreamTelemetry? = null) {
             0xE8.toByte(),
             0x20.toByte(), // 010 (rest of 2ch) + 0 (512 spf) + 0000 (resilience flags)
             0x00.toByte()  // 0000 (ELDEXT_TERM) + 00 (epConfig) + 00 (padding)
-        )
-
-        /** AudioSpecificConfig for AAC-LC (objectType 2): 48 kHz (idx 3), 2 channels (ch 2): 0x1190 */
-        val CSD_AAC_LC_48000_STEREO = byteArrayOf(
-            0x11.toByte(),
-            0x90.toByte()
         )
 
         fun dbToLinear(volumeDb: Float): Float {
