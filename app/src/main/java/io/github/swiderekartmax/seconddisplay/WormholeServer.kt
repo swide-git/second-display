@@ -165,52 +165,7 @@ object WormholeServer {
     private var artGeneration = 0L  // guarded by artLock
 
     val idleStatus: String
-        get() = "Visible in AirPlay & Miracast (Windows / Linux) as “${identity.serviceName}”"
-
-    private val miracastReceiver by lazy {
-        MiracastReceiver(
-            listener = object : MiracastReceiver.Listener {
-                override fun onClientConnected(name: String) {
-                    listener.onClientConnected(name)
-                }
-
-                override fun onClientDisconnected() {
-                    listener.onClientDisconnected()
-                }
-
-                override fun onMirrorRunning(running: Boolean) {
-                    listener.onMirrorRunning(running)
-                }
-
-                override fun onAudioRunning(running: Boolean, ct: Int) {
-                    if (!callbacksEnabled.get()) return
-                    val codec = when (ct) {
-                        NativeBridge.CT_WFD_AAC_48K -> "WFD-AAC-48k"
-                        NativeBridge.CT_WFD_LPCM_48K -> "WFD-LPCM-48k"
-                        else -> "WFD-Audio"
-                    }
-                    if (running) {
-                        audioRenderer.beginSession(codec)
-                    } else if (!_isMirroring.value) {
-                        audioRenderer.endSession()
-                    }
-                }
-
-                override fun onVideoFrame(data: ByteArray, ingressNanos: Long, ptsNs: Long, hevc: Boolean) {
-                    listener.onVideoFrame(data, ingressNanos, ptsNs, ptsNs, hevc)
-                }
-
-                override fun onAudioFrame(data: ByteArray, ptsNs: Long, ct: Int) {
-                    listener.onAudioFrame(data, 0L, ct)
-                }
-
-                override fun onStreamError() {
-                    listener.onStreamError()
-                }
-            },
-            displayInfoProvider = { _displayInfo.value }
-        )
-    }
+        get() = "Visible in AirPlay as “${identity.serviceName}”"
 
     @Synchronized
     fun init(context: Context) {
@@ -377,7 +332,6 @@ object WormholeServer {
                     renderer.hevcDecoder != null
                 )
                 check(port > 0) { "Server failed to start ($port)" }
-                miracastReceiver.start()
                 if (mirrorGeneration.get() == startEvent) {
                     _isMirroring.value = false
                     _clientName.value = null
@@ -387,7 +341,6 @@ object WormholeServer {
             stop = {
                 callbacksEnabled.set(false)
                 callbackGeneration.incrementAndGet()
-                miracastReceiver.stop()
                 renderer.endSession()
                 audioRenderer.endSession()
                 NativeBridge.nativeSetListener(null)
@@ -562,8 +515,6 @@ object WormholeServer {
             val codec = when (ct) {
                 NativeBridge.CT_ALAC -> "ALAC"
                 NativeBridge.CT_AAC_ELD -> "AAC-ELD"
-                NativeBridge.CT_WFD_LPCM_48K -> "WFD-LPCM-48k"
-                NativeBridge.CT_WFD_AAC_48K -> "WFD-AAC-48k"
                 else -> "ct=$ct"
             }
             // Metadata, art and progress arrive only between these two callbacks.

@@ -14,9 +14,8 @@ are not supported by this build. A Mac, iPhone or
 iPad sees the device in its native Screen Mirroring picker and streams video and
 audio to it. The AirPlay heavy lifting (RTSP, FairPlay, decryption, mDNS) is a
 vendored copy of UxPlay's C core at `app/src/main/cpp/uxplay/`; the app layer is
-Kotlin + MediaCodec/AudioTrack. A second, independent receiver path in Kotlin
-speaks Miracast over Infrastructure (MS-MICE) for Linux and Windows senders; see
-"Miracast over Infrastructure" below.
+Kotlin + MediaCodec/AudioTrack. AirPlay is the only protocol: Windows and Linux
+are deliberately unsupported (see "Windows and Linux" below).
 
 ## Repo layout
 
@@ -30,14 +29,14 @@ app/src/main/cpp/dmap.c                   DMAP parser for now-playing metadata (
 app/src/main/cpp/deps/                    committed prebuilt static libs (openssl, plist)
 app/src/main/java/io/github/swiderekartmax/seconddisplay/
     MainActivity.kt                       Compose dashboard + video surface
+    Theme.kt, Palette.kt                  Material You theme (wallpaper colours) and the orange fallback scheme
+    AppIcons.kt                           the few Material icons missing from material-icons-core, as path data
     WormholeService.kt                    foreground service: keeps the receiver discoverable, boot autostart
     WormholeServer.kt                     process-wide owner of the native server, renderers and UI state
     NativeBridge.kt                       JNI declarations
     ScreenOrientation.kt                  portrait/landscape/auto orientation modes and model helpers
     VideoFrameQueue.kt, VideoRenderer.kt  compressed-frame queue → MediaCodec → Surface (H.264/HEVC)
-    AudioRenderer.kt                      AAC-ELD / AAC-LC / PCM decode → AudioTrack (44.1 / 48 kHz)
-    MiracastReceiver.kt                   MS-MICE (TCP 7250) + Wi-Fi Display RTSP M1-M16 client & UDP RTP loop
-    MpegTsDemuxer.kt                      RTP + MPEG-2 Transport Stream PAT/PMT/PES demuxer (H.264/HEVC, LPCM, AAC)
+    AudioRenderer.kt                      AAC-ELD / PCM decode → AudioTrack (44.1 kHz)
     NowPlaying.kt                         track metadata + extrapolated position for audio-only sessions
     WormholeIdentity.kt                   persisted deviceid, service name, Wi-Fi multicast lock
 scripts/build.sh                          build APK → dist/second-display.apk
@@ -106,59 +105,18 @@ Installing on a real device:
 6. Audio (AAC-ELD, 44.1 kHz stereo) is decrypted by the core and delivered to
    `audio_process`; the shim copies each frame to `AudioRenderer`.
 
-## Miracast over Infrastructure (MS-MICE)
+## Windows and Linux
 
-Pure Kotlin, no UxPlay involvement except the mDNS record. It shares the renderers
-and UI state with AirPlay through `WormholeServer`, and starts and stops together
-with the native server.
-
-1. The vendored `mdnsd` also advertises `<name>._display._tcp.local` on TCP 7250
-   with TXT `container_id` (GUID derived from the MAC) and `p2pMAC`
-   (`dnssd_build_display_txt` in `mdnsd/dnssd_mdnsd.c`, listed in
-   `docs/uxplay-patches.md`).
-2. The sender opens TCP 7250 and sends MS-MICE `SOURCE_READY` (0x01) with TLVs
-   `FRIENDLY_NAME` (UTF-16LE), `RTSP_PORT` (default 7236) and `SOURCE_ID`.
-   `STOP_PROJECTION` (0x02) ends the session. The optional messages (DTLS
-   `SECURITY_HANDSHAKE`, `SESSION_REQUEST`, PIN) are not implemented, so senders
-   that require stream encryption or a PIN cannot connect.
-3. **The receiver is the RTSP client**: it connects back to `<sender>:<rtsp_port>`
-   and answers the source's Wi-Fi Display requests (M1 `OPTIONS`, M3
-   `GET_PARAMETER` capabilities, M4 `SET_PARAMETER`, M5 trigger, M16 keep-alive),
-   sending its own M2 `OPTIONS`, M6 `SETUP`, M7 `PLAY` and an M13
-   `wfd_idr_request` after `PLAY`.
-4. The stream arrives as RTP/MPEG-2 TS over UDP (preferred port 19000, fallbacks
-   19002, 19004, any). `MpegTsDemuxer` parses PAT/PMT, reassembles PES, and emits
-   Annex-B H.264/HEVC and 48 kHz LPCM (stream type 0x83, big-endian, 4-byte WFD
-   header) or AAC-LC ADTS. Audio uses the Kotlin-only content types
-   `CT_WFD_LPCM_48K` (16) and `CT_WFD_AAC_48K` (17); `AudioRenderer` rebuilds the
-   `AudioTrack` at 48 kHz for them.
-
-Rules for this path:
-
-- **Advertise only what the pipeline decodes.** M3 offers LPCM mode bit 1 only
-  (48 kHz); bit 0 (44.1 kHz) would be played at the wrong rate. `wfd_video_formats`
-  uses WFD 1.0 tables only (CEA bits 0..16, VESA bits 0..29). The native byte is
-  `(index << 3) | table` with table 0 = CEA, **1 = VESA**, 2 = HH; nothing above
-  1920×1200 exists in WFD 1.0, so larger panels advertise 1080p60 as native.
-- **Windows discovers receivers over Wi-Fi Direct first.** Per Microsoft's
-  MS-MICE guidance, every Wi-Fi Direct beacon and probe response must carry the
-  MS-MICE vendor extension (host name and capability attributes); mDNS and TCP
-  7250 are only used after the user picks a receiver found that way. An ordinary
-  Android app cannot emit those IEs (`WifiP2pManager.setWfdInfo` is a system API),
-  so `Win + K` is not expected to list the device. Treat Windows support as
-  unverified until someone sees it work, and do not claim otherwise.
-- **Linux (GNOME Network Displays)** browses `_display._tcp` over mDNS and is the
-  realistic target for this path. Not yet tested on a device either.
-- The RTSP socket has a 60 s read timeout; the source's M16 keep-alives must
-  arrive within it or the session ends.
-
-Verify the advertisement from a Linux or macOS host:
-
-```bash
-dns-sd -B _display._tcp local.        # macOS; on Linux: avahi-browse -r _display._tcp
-nc -vz <device-ip> 7250               # MS-MICE listener
-adb logcat -s WormholeMiracast        # MS-MICE packets, RTSP M1..M16, RTP errors
-```
+Not supported, on purpose. A Miracast over Infrastructure (MS-MICE) receiver was
+built (`_display._tcp` on TCP 7250, Wi-Fi Display RTSP, RTP/MPEG-2 TS) and removed
+after a Windows PC could not see the device: Windows discovers wireless displays
+over Wi-Fi Direct first, and every beacon must carry the MS-MICE vendor IE, which an
+ordinary Android app cannot emit (`WifiP2pManager.setWfdInfo` is a system API).
+mDNS and TCP 7250 are only used after the user picks a receiver found that way.
+Linux (GNOME Network Displays) would not need Wi-Fi Direct but was never tested,
+and keeping an untested protocol was not worth the code. Do not re-add either
+without a device that proves it works; the removed code is in git history before
+the "AirPlay only" commit.
 
 ## Verification recipes
 
@@ -196,7 +154,7 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
 | Mac mirrors at 1920×1080, looks wrong on the panel | UxPlay defaults advertise 1920×1080@30; **macOS mirrors at whatever you advertise** | `raop_set_plist(raop,"width"/"height"/"refreshRate"/"maxFPS", …)` — done from real display metrics in `nativeStart` |
 | App not in the launcher | Missing launcher icon: some launchers hide icon-less apps | Keep `android:icon="@mipmap/ic_launcher"` in the manifest |
 | Re-pairing a running app via `am start … --es` silently does nothing | Standard-launchMode activities don't get `onNewIntent` when already on top | `android:launchMode="singleTop"` (already set) |
-| Stream is live (decoders started) but the app stays behind the launcher | Android 10 blocks background activity starts; logcat shows `Background activity start … isBgStartWhitelisted: false` | Needs "Display over other apps" (`SYSTEM_ALERT_WINDOW` appop). The dashboard's *Auto-open on connect* row links to it. A new `applicationId` starts without the grant |
+| Stream is live (decoders started) but the app stays behind the launcher | Android 10 blocks background activity starts; logcat shows `Background activity start … isBgStartWhitelisted: false` | Needs "Display over other apps" (`SYSTEM_ALERT_WINDOW` appop). The dashboard's *Open when a stream starts* row links to it. A new `applicationId` starts without the grant |
 | mDNS advertising works on desktop Java but not on device | Android drops multicast without a `WifiManager.MulticastLock`; also needs `CHANGE_WIFI_MULTICAST_STATE` | `WormholeIdentity` holds the multicast lock — it must be held while mdnsd runs |
 | Why not `NsdManager` for Bonjour? | It cannot publish TXT records before API 31; this build supports API 30 | Native `mdnsd` is used instead (and is required for /info anyway) |
 | Native link errors: `dnssd_private_init`, `dnssd_get_*_txt` undefined | Those symbols live in a dnssd *backend*; you must compile exactly one (`mdnsd/`) | `${UX}/mdnsd/*.c` is in the CMake glob |
@@ -214,11 +172,9 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
   compatibility, these strings/bitmasks are the knobs — compare against current
   UxPlay upstream. They are protocol values: never rebrand them.
 - **Ports**: RTSP 7000, mirror data TCP 7100, UDP 7011/7001/7101 — set in
-  `nativeStart`. The mDNS registration must match. Miracast: TCP 7250
-  (`MiracastReceiver.MICE_PORT`, also `MICE_DISPLAY_PORT` in `dnssd_mdnsd.c`; keep
-  both equal) and RTP UDP 19000.
-- **Version indicator**: `MainActivity` shows `versionName` in the header and in
-  *Network & Diagnostics*, and fetches `releases/latest` from `api.github.com` once
+  `nativeStart`. The mDNS registration must match.
+- **Version indicator**: `MainActivity` shows `versionName` in the top app bar
+  (it becomes *Update to vX.Y.Z* when a newer release exists) and in *This receiver*, and fetches `releases/latest` from `api.github.com` once
   per dashboard composition. This is the app's only request outside the LAN; keep
   README "Privacy and security" in sync if that changes.
 - **Audio**: `cb_audio_process` in `wormhole_jni.c` delivers decrypted audio to
@@ -312,6 +268,17 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
   (`<applicationId>/io.github.swiderekartmax.seconddisplay.MainActivity`). The
   user-facing name *Second Display* lives in `app_name`, the dashboard title,
   `WormholeIdentity.DEFAULT_SERVICE_NAME` and the service notification texts.
+- **UI (Material You)**: `SecondDisplayTheme` uses the wallpaper colour scheme on
+  Android 12+ and `Palette.LightScheme` / `DarkScheme` (orange) on Android 11, light
+  or dark with the system. Composables take colours from `MaterialTheme.colorScheme`
+  only; the exceptions are the black mirror background and `TelemetryOverlay`, which
+  sits on video and uses the fixed `Palette.Overlay*` colours. The dashboard is a
+  `Scaffold` with a status card, resolution and orientation tiles, *Settings*,
+  *Recent connections* and *This receiver*; two columns when the window is at least
+  600 dp wide in landscape (or 840 dp in any orientation). Clickable rows and tiles
+  carry `focusRing` so D-pad focus stays visible. Icons come from
+  `material-icons-core` plus `AppIcons`; do not add `material-icons-extended`
+  (megabytes of dex without R8).
 - **Launcher icon**: adaptive icon in `mipmap-anydpi-v26/ic_launcher.xml` (vector
   foreground scaled to 66 % to stay in the safe zone, `#121214` background, monochrome
   layer for themed icons). The PNG mipmaps are only legacy fallbacks; the source design
@@ -379,8 +346,8 @@ device: uninstall first when switching (this resets the receiver identity and th
 
 ## Hard limitations (don't promise otherwise)
 
-- Wi-Fi only, same LAN, no AWDL/p2p. Without Wi-Fi Direct there is no Windows
-  `Win + K` discovery (see "Miracast over Infrastructure").
+- Wi-Fi only, same LAN, no AWDL/p2p. AirPlay senders only; no Windows or Linux
+  (see "Windows and Linux").
 - The sender decides mirroring vs extended display, resolution within the
   advertised modes, and codec; the receiver advertises capabilities and renders
   what it is sent.
