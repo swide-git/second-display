@@ -30,6 +30,7 @@ Second Display is an independent community project and is not affiliated with Ap
 - **Shows up natively on Apple, Windows, and Linux**, under a name you choose (advertising both `_airplay._tcp` on port 7000 and `_display._tcp` on port 7250).
 - **Extended display or mirror**: macOS, Windows 10/11, and Linux can use the device as a second screen or mirror.
 - **Preferred resolution**: offer the sender the native panel size, a common size (1920×1200, 1920×1080, 1680×1050, 1600×900, 1440×900, 1280×720) or 80 / 64 / 50 % of the panel. Lower sizes are lighter on Wi-Fi. Sizes larger than the panel are hidden; sizes with a different aspect are letterboxed, never stretched.
+- **Pinch to zoom**: spread two fingers on the mirrored picture to zoom in up to 5×, drag to move around, double tap to go back. The zoom is local: the sender keeps sending the whole screen.
 - **Settings during a session**: long press on the mirrored picture. Stream stats and speaker output apply at once; resolution and HEVC end the session, because the sender only reads them when it connects.
 - **Survives Wi-Fi hiccups**: a low-latency Wi-Fi lock keeps the radio awake, and a 90-frame decoder buffer absorbs the burst a sender delivers after a stall, catching up without replaying it.
 - **Hardware video decoding**: H.264, with experimental HEVC for senders that choose it.
@@ -134,7 +135,7 @@ On the dashboard (when nothing is connected), under **Controls & Playback**:
 | Run in Background / Start on Boot | Keep the receiver discoverable |
 | Bonjour Service Name | Name shown in Screen Mirroring (default: *Second Display*) |
 
-During a session, **long press on the picture** for stats, speaker, resolution, HEVC and Disconnect.
+During a session, **long press on the picture** for stats, speaker, resolution, HEVC and Disconnect. **Pinch** zooms the picture, **drag** moves a zoomed picture and **double tap** resets it.
 
 ---
 

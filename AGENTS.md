@@ -281,6 +281,13 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
 - **In-session settings**: a transparent `pointerInput` box over the `SurfaceView`
   opens `MirrorSettingsDialog` on long press. Stats overlay and speaker apply live;
   resolution and HEVC restart the receiver. Back inside the dialog only closes it.
+- **Pinch zoom**: the same overlay box runs `detectTransformGestures` (pinch 1-5×,
+  pan) and a double tap reset; the math lives in `PinchZoom` (covered by
+  `PinchZoomTest`). The zoom is applied by laying the `SurfaceView` out at the zoomed
+  size inside a `clipToBounds` box, **not** with `graphicsLayer`: a SurfaceView's
+  surface is a separate layer and does not follow Compose layer transforms. The
+  codec keeps its own buffer size, so a large view does not allocate large buffers.
+  Zoom resets when the picture aspect changes and is never sent to the sender.
 - **Platform rules (targetSdk 35)**: `startForeground` must pass
   `FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE` (manifest type, Android 14); the
   service start is wrapped because Android 12+ can refuse background starts;
