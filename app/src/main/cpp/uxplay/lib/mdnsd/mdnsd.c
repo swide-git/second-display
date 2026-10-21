@@ -58,6 +58,7 @@ struct mdnsd_s {
     char host_name[MDNSD_MAX_NAME];
     mdnsd_service_t airplay;
     mdnsd_service_t raop;
+    mdnsd_service_t display; /* Android port: MS-MICE (_display._tcp.local) */
 
     uint32_t ipv4_addr;
     unsigned char ipv6_addr[16];
@@ -766,13 +767,13 @@ static void mdns_send_service_locked(mdnsd_t *mdnsd, const mdnsd_service_t *serv
 }
 
 static void mdns_send_response_locked(mdnsd_t *mdnsd, int include_airplay,
-                                      int include_raop, int include_host,
-                                      uint32_t ttl, mdns_family_t family,
-                                      const void *to)
+                                      int include_raop, int include_display,
+                                      int include_host, uint32_t ttl,
+                                      mdns_family_t family, const void *to)
 {
     mdns_packet_t packet;
 
-    if (include_airplay && include_raop &&
+    if (include_airplay && include_raop && !include_display &&
         mdnsd->airplay.registered && mdnsd->raop.registered &&
         !mdns_build_combined_response(mdnsd, &packet, include_airplay,
                                       include_raop, include_host, ttl,
@@ -793,7 +794,11 @@ static void mdns_send_response_locked(mdnsd_t *mdnsd, int include_airplay,
         mdns_send_service_locked(mdnsd, &mdnsd->raop, include_host, ttl,
                                  family, to);
     }
-    if (include_host && !include_airplay && !include_raop &&
+    if (include_display) {
+        mdns_send_service_locked(mdnsd, &mdnsd->display, include_host, ttl,
+                                 family, to);
+    }
+    if (include_host && !include_airplay && !include_raop && !include_display &&
         !mdns_build_response(mdnsd, &packet, NULL, 1, ttl, family)) {
         if (family == MDNS_FAMILY_IPV4) {
             mdns_send_packet4(mdnsd, &packet, (const struct sockaddr_in *) to);
@@ -805,13 +810,13 @@ static void mdns_send_response_locked(mdnsd_t *mdnsd, int include_airplay,
 
 static void mdns_announce_locked(mdnsd_t *mdnsd, uint32_t ttl)
 {
-    mdns_send_response_locked(mdnsd, 1, 1, 1, ttl, MDNS_FAMILY_IPV4, NULL);
-    mdns_send_response_locked(mdnsd, 1, 1, 1, ttl, MDNS_FAMILY_IPV6, NULL);
+    mdns_send_response_locked(mdnsd, 1, 1, 1, 1, ttl, MDNS_FAMILY_IPV4, NULL);
+    mdns_send_response_locked(mdnsd, 1, 1, 1, 1, ttl, MDNS_FAMILY_IPV6, NULL);
 }
 
 static int mdns_question_matches_service(const mdnsd_t *mdnsd, const char *name,
                                          uint16_t type, int *airplay, int *raop,
-                                         int *host)
+                                         int *display, int *host)
 {
     if (mdns_name_equals(name, "_services._dns-sd._udp.local") &&
         mdns_query_type_matches(type, DNS_TYPE_PTR)) {
@@ -821,7 +826,10 @@ static int mdns_question_matches_service(const mdnsd_t *mdnsd, const char *name,
         if (mdnsd->raop.registered) {
             *raop = 1;
         }
-        return *airplay || *raop;
+        if (mdnsd->display.registered) {
+            *display = 1;
+        }
+        return *airplay || *raop || *display;
     }
 
     if (mdnsd->airplay.registered &&
@@ -846,6 +854,17 @@ static int mdns_question_matches_service(const mdnsd_t *mdnsd, const char *name,
         return 1;
     }
 
+    if (mdnsd->display.registered &&
+        ((mdns_name_equals(name, mdnsd->display.type) &&
+          mdns_query_type_matches(type, DNS_TYPE_PTR)) ||
+         (mdns_name_equals(name, mdnsd->display.name) &&
+          (mdns_query_type_matches(type, DNS_TYPE_TXT) ||
+           mdns_query_type_matches(type, DNS_TYPE_SRV))))) {
+        *display = 1;
+        *host = 1;
+        return 1;
+    }
+
     if (mdns_name_equals(name, mdnsd->host_name) &&
         (mdns_query_type_matches(type, DNS_TYPE_A) ||
          mdns_query_type_matches(type, DNS_TYPE_AAAA))) {
@@ -865,6 +884,7 @@ static void mdns_handle_query(mdnsd_t *mdnsd, const unsigned char *bytes,
     size_t offset = 12;
     int include_airplay = 0;
     int include_raop = 0;
+    int include_display = 0;
     int include_host = 0;
     int unicast_reply = 0;
 
@@ -897,17 +917,18 @@ static void mdns_handle_query(mdnsd_t *mdnsd, const unsigned char *bytes,
             unicast_reply = 1;
         }
         mdns_question_matches_service(mdnsd, name, type, &include_airplay,
-                                      &include_raop, &include_host);
+                                      &include_raop, &include_display,
+                                      &include_host);
     }
 
-    if (include_airplay || include_raop || include_host) {
+    if (include_airplay || include_raop || include_display || include_host) {
         mdns_send_response_locked(mdnsd, include_airplay, include_raop,
-                                  include_host, MDNSD_TTL_SERVICE, family,
-                                  NULL);
+                                  include_display, include_host,
+                                  MDNSD_TTL_SERVICE, family, NULL);
         if (from && (unicast_reply || from_port != htons(MDNS_PORT))) {
             mdns_send_response_locked(mdnsd, include_airplay, include_raop,
-                                      include_host, MDNSD_TTL_SERVICE, family,
-                                      from);
+                                      include_display, include_host,
+                                      MDNSD_TTL_SERVICE, family, from);
         }
     }
     MUTEX_UNLOCK(mdnsd->mutex);
@@ -1109,7 +1130,8 @@ void mdnsd_stop(mdnsd_t *mdnsd)
 }
 
 void mdnsd_set_services(mdnsd_t *mdnsd, const mdnsd_service_t *airplay,
-                        const mdnsd_service_t *raop)
+                        const mdnsd_service_t *raop,
+                        const mdnsd_service_t *display)
 {
     if (!mdnsd) {
         return;
@@ -1125,6 +1147,11 @@ void mdnsd_set_services(mdnsd_t *mdnsd, const mdnsd_service_t *airplay,
         mdnsd->raop = *raop;
     } else {
         memset(&mdnsd->raop, 0, sizeof(mdnsd->raop));
+    }
+    if (display) {
+        mdnsd->display = *display;
+    } else {
+        memset(&mdnsd->display, 0, sizeof(mdnsd->display));
     }
     MUTEX_UNLOCK(mdnsd->mutex);
 }
