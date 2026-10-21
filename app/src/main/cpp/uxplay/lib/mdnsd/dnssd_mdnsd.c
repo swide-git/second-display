@@ -29,18 +29,24 @@
 
 #include "mdnsd.h"
 
+#define MICE_DISPLAY_PORT 7250
+
 typedef struct dnssd_private_s {
     mdnsd_txt_t raop_record;
     mdnsd_txt_t airplay_record;
+    mdnsd_txt_t display_record; /* Android port: MS-MICE (_display._tcp.local) */
 
     char host_name[MDNSD_MAX_NAME];
     char raop_name[MDNSD_MAX_NAME];
     char airplay_name[MDNSD_MAX_NAME];
+    char display_name[MDNSD_MAX_NAME];
 
     unsigned short raop_port;
     unsigned short airplay_port;
+    unsigned short display_port;
     int raop_registered;
     int airplay_registered;
+    int display_registered;
 
     mdnsd_t *mdnsd;
 } dnssd_private_t;
@@ -93,6 +99,11 @@ static int dnssd_prepare_names(dnssd_private_t *dnssd, dnssd_t *dnssd_public)
 
     if (snprintf(dnssd->airplay_name, sizeof(dnssd->airplay_name), "%s._airplay._tcp.local",
                  dnssd_public->name) >= (int) sizeof(dnssd->airplay_name)) {
+        return -1;
+    }
+
+    if (snprintf(dnssd->display_name, sizeof(dnssd->display_name), "%s._display._tcp.local",
+                 dnssd_public->name) >= (int) sizeof(dnssd->display_name)) {
         return -1;
     }
 
@@ -176,6 +187,32 @@ static int dnssd_build_airplay_txt(dnssd_t *dnssd_public)
            mdnsd_txt_add(&dnssd->airplay_record, "vv", AIRPLAY_VV);
 }
 
+/* Android port: build MS-MICE (_display._tcp.local) TXT records (container_id, p2pMAC) */
+static int dnssd_build_display_txt(dnssd_t *dnssd_public)
+{
+    assert(dnssd_public);
+    assert(dnssd_public->dnssd_private);
+    dnssd_private_t *dnssd = (dnssd_private_t *) dnssd_public->dnssd_private;
+
+    char device_id[3 * MAX_HWADDR_LEN];
+    char hwaddr_hex[2 * MAX_HWADDR_LEN + 1];
+    char container_id[40];
+
+    if (utils_hwaddr_airplay(device_id, sizeof(device_id), dnssd_public->hw_addr, dnssd_public->hw_addr_len) < 0) {
+        return -1;
+    }
+    if (utils_hwaddr_raop(hwaddr_hex, sizeof(hwaddr_hex), dnssd_public->hw_addr, dnssd_public->hw_addr_len) < 0) {
+        return -1;
+    }
+
+    snprintf(container_id, sizeof(container_id),
+             "{5ec02dd1-c0de-4f01-a1b2-%.12s}", hwaddr_hex);
+
+    dnssd->display_record.length = 0;
+    return mdnsd_txt_add(&dnssd->display_record, "container_id", container_id) ||
+           mdnsd_txt_add(&dnssd->display_record, "p2pMAC", device_id);
+}
+
 static void dnssd_fill_airplay_service(dnssd_private_t *dnssd, mdnsd_service_t *service)
 {
     memset(service, 0, sizeof(*service));
@@ -196,14 +233,26 @@ static void dnssd_fill_raop_service(dnssd_private_t *dnssd, mdnsd_service_t *ser
     service->registered = dnssd->raop_registered;
 }
 
+static void dnssd_fill_display_service(dnssd_private_t *dnssd, mdnsd_service_t *service)
+{
+    memset(service, 0, sizeof(*service));
+    snprintf(service->type, sizeof(service->type), "%s", "_display._tcp.local");
+    snprintf(service->name, sizeof(service->name), "%s", dnssd->display_name);
+    service->port = dnssd->display_port;
+    service->txt = dnssd->display_record;
+    service->registered = dnssd->display_registered;
+}
+
 static void dnssd_update_mdnsd(dnssd_private_t *dnssd)
 {
     mdnsd_service_t airplay;
     mdnsd_service_t raop;
+    mdnsd_service_t display;
 
     dnssd_fill_airplay_service(dnssd, &airplay);
     dnssd_fill_raop_service(dnssd, &raop);
-    mdnsd_set_services(dnssd->mdnsd, &airplay, &raop);
+    dnssd_fill_display_service(dnssd, &display);
+    mdnsd_set_services(dnssd->mdnsd, &airplay, &raop, &display);
 }
 
 void *
@@ -278,12 +327,14 @@ dnssd_register_airplay(dnssd_t *dnssd_public, unsigned short port)
     assert(dnssd_public->dnssd_private);
     dnssd_private_t *dnssd = (dnssd_private_t *) dnssd_public->dnssd_private;
 
-    if (dnssd_build_airplay_txt(dnssd_public)) {
+    if (dnssd_build_airplay_txt(dnssd_public) || dnssd_build_display_txt(dnssd_public)) {
         return -1;
     }
 
     dnssd->airplay_port = port;
     dnssd->airplay_registered = 1;
+    dnssd->display_port = MICE_DISPLAY_PORT;
+    dnssd->display_registered = 1;
     dnssd_update_mdnsd(dnssd);
 
     ret = mdnsd_start(dnssd->mdnsd);
@@ -347,6 +398,12 @@ dnssd_unregister_airplay(dnssd_t *dnssd_public)
         mdnsd_service_t service;
         dnssd_fill_airplay_service(dnssd, &service);
         mdnsd_goodbye(dnssd->mdnsd, &service);
+        if (dnssd->display_registered) {
+            mdnsd_service_t display_service;
+            dnssd_fill_display_service(dnssd, &display_service);
+            mdnsd_goodbye(dnssd->mdnsd, &display_service);
+            dnssd->display_registered = 0;
+        }
         dnssd->airplay_registered = 0;
         dnssd_update_mdnsd(dnssd);
     }

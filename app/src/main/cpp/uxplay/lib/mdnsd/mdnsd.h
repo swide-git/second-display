@@ -45,7 +45,8 @@ int mdnsd_start(mdnsd_t *mdnsd);
 void mdnsd_stop(mdnsd_t *mdnsd);
 
 void mdnsd_set_services(mdnsd_t *mdnsd, const mdnsd_service_t *airplay,
-                        const mdnsd_service_t *raop);
+                        const mdnsd_service_t *raop,
+                        const mdnsd_service_t *display);
 void mdnsd_announce(mdnsd_t *mdnsd, uint32_t ttl);
 void mdnsd_goodbye(mdnsd_t *mdnsd, const mdnsd_service_t *service);
 
