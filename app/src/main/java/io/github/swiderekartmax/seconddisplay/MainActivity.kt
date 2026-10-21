@@ -525,6 +525,38 @@ private fun DashboardScreen(
     var showNameDialog by remember { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
     val context = LocalContext.current
+    val appVersion = remember(context) {
+        runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.1.0-dev"
+        }.getOrDefault("0.1.0-dev")
+    }
+    var latestReleaseVersion by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                val url = java.net.URL("https://api.github.com/repos/swiderekart-max/second-display/releases/latest")
+                val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
+                    connectTimeout = 5000
+                    readTimeout = 5000
+                    setRequestProperty("Accept", "application/vnd.github+json")
+                    setRequestProperty("User-Agent", "SecondDisplay/$appVersion")
+                }
+                try {
+                    if (conn.responseCode == 200) {
+                        val body = conn.inputStream.bufferedReader().use { it.readText() }
+                        val match = Regex(""""tag_name"\s*:\s*"v?([^"]+)"""").find(body)
+                        match?.groupValues?.getOrNull(1)?.let { tag ->
+                            latestReleaseVersion = tag
+                        }
+                    }
+                } finally {
+                    conn.disconnect()
+                }
+            }
+        }
+    }
+    val baseAppVersion = remember(appVersion) { appVersion.substringBefore("-") }
+    val hasNewerRelease = latestReleaseVersion != null && latestReleaseVersion != baseAppVersion && latestReleaseVersion != appVersion
     val isAutoSupported = remember(context) { WormholeIdentity.hasOrientationSensor(context) }
     val availableOrientations = remember(isAutoSupported) {
         if (isAutoSupported) {
@@ -559,15 +591,44 @@ private fun DashboardScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                Text(
-                    text = "Second Display",
-                    fontSize = if (isTvOrCompact) 20.sp else if (isCompactScreen) 26.sp else 32.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Second Display",
+                        fontSize = if (isTvOrCompact) 20.sp else if (isCompactScreen) 26.sp else 32.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Palette.SurfaceVariant,
+                        border = BorderStroke(1.dp, Palette.Border),
+                        modifier = Modifier.clickable {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(
+                                        Intent.ACTION_VIEW,
+                                        Uri.parse("https://github.com/swiderekart-max/second-display/releases/latest")
+                                    )
+                                )
+                            }
+                        }
+                    ) {
+                        Text(
+                            text = if (hasNewerRelease) "v$appVersion → v$latestReleaseVersion" else "v$appVersion",
+                            fontSize = if (isTvOrCompact) 10.sp else 12.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Medium,
+                            color = if (hasNewerRelease) Palette.Warning else Palette.TextMuted,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.height(if (isTvOrCompact) 2.dp else if (isCompactScreen) 3.dp else 6.dp))
                 Text(
-                    text = "On your Mac or iPhone: Control Center → Screen Mirroring → $serviceName",
+                    text = "Mac / iPhone (Screen Mirroring) or Windows (Win + K) → $serviceName",
                     fontSize = if (isTvOrCompact) 12.sp else if (isCompactScreen) 14.sp else 18.sp,
                     color = Palette.TextSecondary
                 )
@@ -1135,12 +1196,21 @@ private fun DashboardScreen(
                         color = Palette.Text
                     )
                     Spacer(modifier = Modifier.height(if (isTvOrCompact) 2.dp else if (isCompactScreen) 8.dp else 14.dp))
+                    val versionSummary = remember(appVersion, latestReleaseVersion) {
+                        if (latestReleaseVersion != null) {
+                            "v$appVersion (Latest: v$latestReleaseVersion)"
+                        } else {
+                            "v$appVersion"
+                        }
+                    }
                     if (isTvOrCompact) {
                         Row(modifier = Modifier.fillMaxWidth()) {
                             Column(modifier = Modifier.weight(1f)) {
                                 InfoRow(label = "Wi-Fi", value = networkDetails.wifiSsid, fontSize = 11.sp)
                                 Spacer(modifier = Modifier.height(1.dp))
-                                InfoRow(label = "Bonjour", value = "$serviceName (7000)", fontSize = 11.sp)
+                                InfoRow(label = "Services", value = "$serviceName (7000/7250)", fontSize = 11.sp)
+                                Spacer(modifier = Modifier.height(1.dp))
+                                InfoRow(label = "Version", value = versionSummary, fontSize = 11.sp)
                             }
                             Spacer(modifier = Modifier.width(16.dp))
                             Column(modifier = Modifier.weight(1f)) {
@@ -1154,9 +1224,11 @@ private fun DashboardScreen(
                         Spacer(modifier = Modifier.height(if (isCompactScreen) 4.dp else 8.dp))
                         InfoRow(label = "Device IP", value = networkDetails.ipAddress)
                         Spacer(modifier = Modifier.height(if (isCompactScreen) 4.dp else 8.dp))
-                        InfoRow(label = "Bonjour Service", value = "$serviceName (Port 7000)")
+                        InfoRow(label = "Receiver Services", value = "$serviceName (AirPlay 7000 • Miracast 7250)")
                         Spacer(modifier = Modifier.height(if (isCompactScreen) 4.dp else 8.dp))
                         InfoRow(label = "Display", value = "${displayInfo.width} × ${displayInfo.height} @ ${displayInfo.refreshRate}Hz (Auto-fit)")
+                        Spacer(modifier = Modifier.height(if (isCompactScreen) 4.dp else 8.dp))
+                        InfoRow(label = "App Version", value = versionSummary)
                     }
                 }
             }
