@@ -266,6 +266,11 @@ adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
   `START_STICKY` only with background on, and a sticky restart with background off
   stops itself. The close button in the top bar always stops both and calls
   `finishAndRemoveTask()`.
+- **16 KB pages**: `-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON` (cmake arguments in
+  `app/build.gradle.kts`) aligns `libseconddisplay.so` LOAD segments to 16 KB; NDK r27
+  defaults to 4 KB. Without it Google Play withholds the app from devices with 16 KB
+  memory pages, which report "can't download" (a Galaxy S26 Ultra did). CI checks
+  `llvm-readelf -lW` and `zipalign -c -P 16` on every build.
 - **Platform rules (targetSdk 36)**: `startForeground` must pass
   `FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE` (manifest type, Android 14); the
   service start is wrapped because Android 12+ can refuse background starts;
