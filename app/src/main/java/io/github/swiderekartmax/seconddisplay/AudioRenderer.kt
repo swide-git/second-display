@@ -21,7 +21,7 @@ class AudioRenderer(private val telemetry: StreamTelemetry? = null) {
     private var currentVolumeDb = 0.0f
     private val frameQueue = ArrayDeque<AudioPacket>()
 
-    private val worker = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "Wormhole audio") }
+    private val worker = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "Receiver audio") }
 
     // Confined to worker thread
     private var decoder: MediaCodec? = null
@@ -397,7 +397,7 @@ class AudioRenderer(private val telemetry: StreamTelemetry? = null) {
     }
 
     internal companion object {
-        const val TAG = "WormholeAudio"
+        const val TAG = "SecondDisplayAudio"
         const val SAMPLE_RATE = 44100
         const val MAX_QUEUE_SIZE = 30
         /** ~4 s of 352-frame ALAC packets: audio-only senders run about 2 s ahead. */

@@ -11,7 +11,7 @@ marked "Android JNI addition").
 | `raop_rtp_mirror.c` | H.264/HEVC parameter-set bounds checks; clear previous prepend state before replacing configuration; validate AVCC length/header availability before reads; allocation cap; EOF/allocation/streaming-report cleanup; worker-join ownership (the mirror worker no longer stops/joins itself). |
 | `httpd.c` | Join a finished but unjoined worker before freeing it. |
 | `byteutils.c` | Alignment-safe (`memcpy`) packet field loads/stores. |
-| `raop.c` / `raop.h` | Legacy RAOP ("AirTunes") audio for RSA senders (iTunes, older macOS, some Android AirPlay apps; NOT modern macOS Music — see note): `ANNOUNCE` dispatch, `Apple-Challenge`→`Apple-Response` (RSA), an `rsakey` field, and an `audio_running` callback. |
+| `raop.c` / `raop.h` | Legacy RAOP ("AirTunes") audio for RSA senders (iTunes, older macOS, some Android AirPlay apps; NOT modern macOS Music - see note): `ANNOUNCE` dispatch, `Apple-Challenge`→`Apple-Response` (RSA), an `rsakey` field, and an `audio_running` callback. |
 | `raop_handlers.h` | `raop_handler_announce` (SDP parse, RSA-OAEP AES key, ALAC fmtp) and a legacy Transport-header branch of `raop_handler_setup`. |
 | `raop_rtp.c` | Fire the new `audio_running` callback on audio-thread start/exit. |
 | `raop_buffer.c` | Allow a NULL AES key (unencrypted legacy session). |

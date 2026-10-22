@@ -7,7 +7,7 @@ import android.util.Log
 
 /**
  * BroadcastReceiver triggered when the Android system boots up or after an app update.
- * Automatically starts [WormholeService] in the background if autostart is enabled.
+ * Automatically starts [ReceiverService] in the background if autostart is enabled.
  */
 class BootReceiver : BroadcastReceiver() {
     companion object {
@@ -29,8 +29,8 @@ class BootReceiver : BroadcastReceiver() {
 
             Log.i(TAG, "Checking autostart settings: start_on_boot=$startOnBoot, run_in_background=$runInBackground")
             if (startOnBoot && runInBackground) {
-                Log.i(TAG, "Autostart condition met -> launching WormholeService")
-                WormholeService.start(context)
+                Log.i(TAG, "Autostart condition met -> launching ReceiverService")
+                ReceiverService.start(context)
             }
         }
     }

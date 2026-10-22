@@ -173,7 +173,7 @@ class MainActivity : ComponentActivity() {
         }
         requestNotificationPermission()
 
-        WormholeServer.init(applicationContext)
+        ReceiverServer.init(applicationContext)
 
         val metrics = android.util.DisplayMetrics()
         @Suppress("DEPRECATION")
@@ -182,42 +182,40 @@ class MainActivity : ComponentActivity() {
         val fps = windowManager.defaultDisplay.mode?.refreshRate?.toInt()
             ?: windowManager.defaultDisplay.refreshRate.toInt()
         val isPortrait = resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
-        WormholeServer.onConfigurationChanged(metrics.widthPixels, metrics.heightPixels, fps, isPortrait)
+        ReceiverServer.onConfigurationChanged(metrics.widthPixels, metrics.heightPixels, fps, isPortrait)
 
-        updateOrientationMode(WormholeServer.orientationSetting.value)
-
-        WormholeService.start(this)
+        updateOrientationMode(ReceiverServer.orientationSetting.value)
 
         setContent {
-            val mirroring by WormholeServer.isMirroring.collectAsState()
-            val audioStreaming by WormholeServer.isAudioStreaming.collectAsState()
-            val nowPlaying by WormholeServer.nowPlaying.collectAsState()
-            val nowPlayingArt by WormholeServer.nowPlayingArt.collectAsState()
-            val client by WormholeServer.clientName.collectAsState()
-            val status by WormholeServer.statusText.collectAsState()
-            val videoAspectRatio by WormholeServer.videoAspectRatio.collectAsState()
-            val recentConnections by WormholeServer.recentConnections.collectAsState()
-            val displayInfo by WormholeServer.displayInfo.collectAsState()
-            val orientationSetting by WormholeServer.orientationSetting.collectAsState()
-            val orientationNotice by WormholeServer.orientationNotice.collectAsState()
+            val mirroring by ReceiverServer.isMirroring.collectAsState()
+            val audioStreaming by ReceiverServer.isAudioStreaming.collectAsState()
+            val nowPlaying by ReceiverServer.nowPlaying.collectAsState()
+            val nowPlayingArt by ReceiverServer.nowPlayingArt.collectAsState()
+            val client by ReceiverServer.clientName.collectAsState()
+            val status by ReceiverServer.statusText.collectAsState()
+            val videoAspectRatio by ReceiverServer.videoAspectRatio.collectAsState()
+            val recentConnections by ReceiverServer.recentConnections.collectAsState()
+            val displayInfo by ReceiverServer.displayInfo.collectAsState()
+            val orientationSetting by ReceiverServer.orientationSetting.collectAsState()
+            val orientationNotice by ReceiverServer.orientationNotice.collectAsState()
 
             LaunchedEffect(orientationSetting) {
                 updateOrientationMode(orientationSetting)
             }
 
-            var audioEnabled by remember { mutableStateOf(WormholeServer.audioEnabled) }
-            var debugOverlayEnabled by remember { mutableStateOf(WormholeServer.debugOverlayEnabled) }
-            var hevcEnabled by remember { mutableStateOf(WormholeServer.hevcEnabled) }
-            var runInBackground by remember { mutableStateOf(WormholeServer.runInBackground) }
-            var startOnBoot by remember { mutableStateOf(WormholeServer.startOnBoot) }
-            var serviceName by remember { mutableStateOf(WormholeServer.identity.serviceName) }
-            val resolutionPreset by WormholeServer.resolutionPreset.collectAsState()
+            var audioEnabled by remember { mutableStateOf(ReceiverServer.audioEnabled) }
+            var debugOverlayEnabled by remember { mutableStateOf(ReceiverServer.debugOverlayEnabled) }
+            var hevcEnabled by remember { mutableStateOf(ReceiverServer.hevcEnabled) }
+            var runInBackground by remember { mutableStateOf(ReceiverServer.runInBackground) }
+            var startOnBoot by remember { mutableStateOf(ReceiverServer.startOnBoot) }
+            var serviceName by remember { mutableStateOf(ReceiverServer.identity.serviceName) }
+            val resolutionPreset by ReceiverServer.resolutionPreset.collectAsState()
             var showMirrorSettings by remember { mutableStateOf(false) }
 
             SecondDisplayTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     if (mirroring) {
-                        BackHandler { WormholeServer.disconnectClient("back") }
+                        BackHandler { ReceiverServer.disconnectClient("back") }
                         // Pinch zoom is local only; a new picture geometry starts unzoomed.
                         var zoom by remember(videoAspectRatio) { mutableStateOf(PinchZoom()) }
                         var containerSize by remember { mutableStateOf(IntSize.Zero) }
@@ -248,11 +246,11 @@ class MainActivity : ComponentActivity() {
                                     SurfaceView(context).apply {
                                         holder.addCallback(object : SurfaceHolder.Callback {
                                             override fun surfaceCreated(holder: SurfaceHolder) {
-                                                WormholeServer.setSurface(holder.surface)
+                                                ReceiverServer.setSurface(holder.surface)
                                             }
                                             override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
                                             override fun surfaceDestroyed(holder: SurfaceHolder) {
-                                                WormholeServer.setSurface(null)
+                                                ReceiverServer.setSurface(null)
                                             }
                                         })
                                     }
@@ -261,7 +259,7 @@ class MainActivity : ComponentActivity() {
                             )
                             if (debugOverlayEnabled) {
                                 TelemetryOverlay(
-                                    telemetry = WormholeServer.renderer.telemetry,
+                                    telemetry = ReceiverServer.renderer.telemetry,
                                     modifier = Modifier
                                         .align(Alignment.TopStart)
                                         .padding(16.dp)
@@ -302,30 +300,30 @@ class MainActivity : ComponentActivity() {
                                 debugOverlayEnabled = debugOverlayEnabled,
                                 onDebugOverlayEnabledChanged = { enabled ->
                                     debugOverlayEnabled = enabled
-                                    WormholeServer.setDebugOverlayEnabled(enabled)
+                                    ReceiverServer.setDebugOverlayEnabled(enabled)
                                 },
                                 audioEnabled = audioEnabled,
                                 onAudioEnabledChanged = { enabled ->
                                     audioEnabled = enabled
-                                    WormholeServer.setAudioEnabled(enabled)
+                                    ReceiverServer.setAudioEnabled(enabled)
                                 },
                                 resolutionPreset = resolutionPreset,
-                                onResolutionPresetChanged = { WormholeServer.setResolutionPreset(it) },
+                                onResolutionPresetChanged = { ReceiverServer.setResolutionPreset(it) },
                                 hevcEnabled = hevcEnabled,
                                 onHevcEnabledChanged = { enabled ->
                                     hevcEnabled = enabled
-                                    WormholeServer.setHevcEnabled(enabled)
+                                    ReceiverServer.setHevcEnabled(enabled)
                                 },
                                 onDisconnect = {
                                     showMirrorSettings = false
-                                    WormholeServer.disconnectClient("settings")
+                                    ReceiverServer.disconnectClient("settings")
                                 },
                                 onDismiss = { showMirrorSettings = false }
                             )
                         }
                     } else if (audioStreaming) {
                         // Audio-only AirPlay (speaker) session: full-screen now playing, left with Back/Home like mirroring.
-                        BackHandler { WormholeServer.disconnectClient("back") }
+                        BackHandler { ReceiverServer.disconnectClient("back") }
                         NowPlayingScreen(
                             nowPlaying = nowPlaying,
                             artwork = nowPlayingArt,
@@ -336,8 +334,8 @@ class MainActivity : ComponentActivity() {
                         DashboardScreen(
                             serviceName = serviceName,
                             onServiceNameChanged = { newName ->
-                                WormholeServer.updateServiceName(newName)
-                                serviceName = WormholeServer.identity.serviceName
+                                ReceiverServer.updateServiceName(newName)
+                                serviceName = ReceiverServer.identity.serviceName
                                 networkDetails = NetworkInfoHelper.getNetworkDetails(this@MainActivity)
                             },
                             status = status,
@@ -346,48 +344,49 @@ class MainActivity : ComponentActivity() {
                             audioEnabled = audioEnabled,
                             onAudioEnabledChanged = { enabled ->
                                 audioEnabled = enabled
-                                WormholeServer.setAudioEnabled(enabled)
+                                ReceiverServer.setAudioEnabled(enabled)
                             },
                             debugOverlayEnabled = debugOverlayEnabled,
                             hevcEnabled = hevcEnabled,
                             onHevcEnabledChanged = { enabled ->
                                 hevcEnabled = enabled
-                                WormholeServer.setHevcEnabled(enabled)
+                                ReceiverServer.setHevcEnabled(enabled)
                             },
                             onDebugOverlayEnabledChanged = { enabled ->
                                 debugOverlayEnabled = enabled
-                                WormholeServer.setDebugOverlayEnabled(enabled)
+                                ReceiverServer.setDebugOverlayEnabled(enabled)
                             },
                             runInBackground = runInBackground,
                             onRunInBackgroundChanged = { enabled ->
                                 runInBackground = enabled
-                                WormholeServer.setRunInBackground(enabled)
+                                ReceiverServer.setRunInBackground(enabled)
                                 if (enabled) {
-                                    WormholeService.start(this@MainActivity)
+                                    ReceiverService.start(this@MainActivity)
                                 }
                             },
                             startOnBoot = startOnBoot,
                             onStartOnBootChanged = { enabled ->
                                 startOnBoot = enabled
-                                WormholeServer.setStartOnBoot(enabled)
+                                ReceiverServer.setStartOnBoot(enabled)
                             },
                             canAutoOpen = canAutoOpen,
                             onRequestAutoOpen = { openOverlaySettings() },
                             onRestartServer = {
-                                WormholeServer.restartServer()
+                                ReceiverServer.restartServer()
                                 networkDetails = NetworkInfoHelper.getNetworkDetails(this@MainActivity)
                             },
                             recentConnections = recentConnections,
                             orientationSetting = orientationSetting,
-                            onOrientationSettingChanged = { WormholeServer.setOrientationSetting(it) },
+                            onOrientationSettingChanged = { ReceiverServer.setOrientationSetting(it) },
                             resolutionPreset = resolutionPreset,
-                            onResolutionPresetChanged = { WormholeServer.setResolutionPreset(it) }
+                            onResolutionPresetChanged = { ReceiverServer.setResolutionPreset(it) },
+                            onQuit = { quit() }
                         )
 
                         orientationNotice?.let { notice ->
                             OrientationNoticeDialog(
                                 notice = notice,
-                                onDismiss = { WormholeServer.dismissOrientationNotice() }
+                                onDismiss = { ReceiverServer.dismissOrientationNotice() }
                             )
                         }
                     }
@@ -418,9 +417,37 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // The receiver runs while the app is visible. With "Run in background" off it stops as soon
+    // as the app leaves the screen (Home, recents, screen off), not only when the activity is
+    // destroyed, which on a tablet can take hours.
+    override fun onStart() {
+        super.onStart()
+        startedActivities++
+        ReceiverService.start(this)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        startedActivities--
+        if (!isChangingConfigurations && startedActivities == 0 && !ReceiverServer.runInBackground) {
+            stopReceiver()
+        }
+    }
+
+    private fun stopReceiver() {
+        ReceiverService.stop(this)
+        ReceiverServer.stopServer()
+    }
+
+    /** Quit from the top app bar: stop the receiver whatever "Run in background" says and close the task. */
+    private fun quit() {
+        stopReceiver()
+        finishAndRemoveTask()
+    }
+
     override fun onResume() {
         super.onResume()
-        WormholeServer.isActivityResumed = true
+        ReceiverServer.isActivityResumed = true
         networkDetails = NetworkInfoHelper.getNetworkDetails(this)
         canAutoOpen = Settings.canDrawOverlays(this)
     }
@@ -429,12 +456,12 @@ class MainActivity : ComponentActivity() {
         val perApp = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
         runCatching { startActivity(perApp) }
             .recoverCatching { startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)) }
-            .onFailure { android.util.Log.w("Wormhole", "No overlay permission settings screen", it) }
+            .onFailure { android.util.Log.w("SecondDisplay", "No overlay permission settings screen", it) }
     }
 
     override fun onPause() {
         super.onPause()
-        WormholeServer.isActivityResumed = false
+        ReceiverServer.isActivityResumed = false
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -446,11 +473,11 @@ class MainActivity : ComponentActivity() {
         val fps = windowManager.defaultDisplay.mode?.refreshRate?.toInt()
             ?: windowManager.defaultDisplay.refreshRate.toInt()
         val isPortrait = newConfig.orientation == Configuration.ORIENTATION_PORTRAIT
-        WormholeServer.onConfigurationChanged(metrics.widthPixels, metrics.heightPixels, fps, isPortrait)
+        ReceiverServer.onConfigurationChanged(metrics.widthPixels, metrics.heightPixels, fps, isPortrait)
     }
 
     private fun updateOrientationMode(setting: ScreenOrientation) {
-        val effectiveSetting = if (!WormholeIdentity.hasOrientationSensor(this) && setting == ScreenOrientation.AUTO) {
+        val effectiveSetting = if (!ReceiverIdentity.hasOrientationSensor(this) && setting == ScreenOrientation.AUTO) {
             ScreenOrientation.LANDSCAPE
         } else {
             setting
@@ -465,20 +492,19 @@ class MainActivity : ComponentActivity() {
     // Home is a deliberate exit; not called when the service brings this activity forward.
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        WormholeServer.disconnectClient("home")
+        ReceiverServer.disconnectClient("home")
     }
 
     override fun onDestroy() {
-        WormholeServer.setSurface(null)
-        if (!WormholeServer.runInBackground) {
-            WormholeService.stop(this)
-            WormholeServer.stopServer()
-        }
+        ReceiverServer.setSurface(null)
         super.onDestroy()
     }
 
     private companion object {
         const val REQUEST_NOTIFICATIONS = 1
+
+        /** Started (visible) MainActivity instances; the service may bring a second one forward. */
+        var startedActivities = 0
     }
 }
 
@@ -692,13 +718,13 @@ private fun PickerTile(
 
 @Composable
 private fun ResolutionMenu(selected: ResolutionPreset, expanded: Boolean, onDismiss: () -> Unit, onSelected: (ResolutionPreset) -> Unit) {
-    val available = WormholeServer.availableResolutionPresets()
+    val available = ReceiverServer.availableResolutionPresets()
     // A preset that does not fit this panel is not applied; show what is actually advertised.
     val effective = if (selected in available) selected else ResolutionPreset.NATIVE
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         available.forEach { preset ->
             DropdownMenuItem(
-                text = { Text(WormholeServer.resolutionLabel(preset)) },
+                text = { Text(ReceiverServer.resolutionLabel(preset)) },
                 leadingIcon = if (preset == effective) {
                     { Icon(Icons.Filled.Check, contentDescription = "Selected") }
                 } else null,
@@ -741,7 +767,8 @@ private fun DashboardScreen(
     orientationSetting: ScreenOrientation,
     onOrientationSettingChanged: (ScreenOrientation) -> Unit,
     resolutionPreset: ResolutionPreset,
-    onResolutionPresetChanged: (ResolutionPreset) -> Unit
+    onResolutionPresetChanged: (ResolutionPreset) -> Unit,
+    onQuit: () -> Unit
 ) {
     var showNameDialog by remember { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
@@ -778,7 +805,7 @@ private fun DashboardScreen(
     }
     val baseAppVersion = remember(appVersion) { appVersion.substringBefore("-") }
     val hasNewerRelease = latestReleaseVersion != null && latestReleaseVersion != baseAppVersion && latestReleaseVersion != appVersion
-    val isAutoSupported = remember(context) { WormholeIdentity.hasOrientationSensor(context) }
+    val isAutoSupported = remember(context) { ReceiverIdentity.hasOrientationSensor(context) }
     val availableOrientations = remember(isAutoSupported) {
         if (isAutoSupported) {
             ScreenOrientation.values().toList()
@@ -796,11 +823,11 @@ private fun DashboardScreen(
 
     val pickers = @Composable {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            val available = WormholeServer.availableResolutionPresets()
+            val available = ReceiverServer.availableResolutionPresets()
             val effective = if (resolutionPreset in available) resolutionPreset else ResolutionPreset.NATIVE
             PickerTile(
                 label = "Resolution",
-                value = WormholeServer.resolutionLabel(effective),
+                value = ReceiverServer.resolutionLabel(effective),
                 icon = AppIcons.AspectRatio,
                 modifier = Modifier.weight(1f)
             ) { expanded, dismiss ->
@@ -994,7 +1021,10 @@ private fun DashboardScreen(
                     } else {
                         TextButton(onClick = openReleases) { Text("v$appVersion") }
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(onClick = onQuit, modifier = Modifier.focusRing(CircleShape)) {
+                        Icon(Icons.Filled.Close, contentDescription = "Quit Second Display")
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
                 },
                 windowInsets = WindowInsets.displayCutout,
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -1079,9 +1109,9 @@ private fun DashboardScreen(
             },
             dismissButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (serviceName != WormholeIdentity.DEFAULT_SERVICE_NAME) {
+                    if (serviceName != ReceiverIdentity.DEFAULT_SERVICE_NAME) {
                         TextButton(onClick = {
-                            onServiceNameChanged(WormholeIdentity.DEFAULT_SERVICE_NAME)
+                            onServiceNameChanged(ReceiverIdentity.DEFAULT_SERVICE_NAME)
                             showNameDialog = false
                         }) { Text("Reset") }
                     }
@@ -1236,7 +1266,7 @@ private fun NowPlayingScreen(
         }
         if (debugOverlayEnabled) {
             TelemetryOverlay(
-                telemetry = WormholeServer.renderer.telemetry,
+                telemetry = ReceiverServer.renderer.telemetry,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(16.dp)
@@ -1330,7 +1360,7 @@ private fun TelemetryLine(tag: String, active: Boolean, accent: Color, text: Str
 
 @Composable
 private fun OrientationNoticeDialog(
-    notice: WormholeServer.OrientationNotice,
+    notice: ReceiverServer.OrientationNotice,
     onDismiss: () -> Unit
 ) {
     var remainingSeconds by remember(notice.timestamp) { mutableStateOf(30) }
@@ -1431,7 +1461,7 @@ private fun MirrorSettingsDialog(
                 Box {
                     ListItem(
                         headlineContent = { Text("Resolution") },
-                        supportingContent = { Text(WormholeServer.resolutionLabel(resolutionPreset)) },
+                        supportingContent = { Text(ReceiverServer.resolutionLabel(resolutionPreset)) },
                         trailingContent = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         modifier = Modifier

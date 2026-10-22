@@ -1,10 +1,10 @@
 /*
  * Minimal DMAP ("x-dmap-tagged") parser for AirPlay now-playing metadata.
  * Extracts track title / artist / album / year from the SET_PARAMETER bundle
- * that iTunes, Music, and Music Assistant send. Part of Wormhole Display (GPLv3).
+ * that iTunes, Music, and Music Assistant send. Part of Second Display (GPLv3), originally written for Wormhole Display.
  */
-#ifndef WORMHOLE_DMAP_H
-#define WORMHOLE_DMAP_H
+#ifndef SECOND_DISPLAY_DMAP_H
+#define SECOND_DISPLAY_DMAP_H
 
 #include <stddef.h>
 

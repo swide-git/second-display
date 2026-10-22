@@ -30,7 +30,7 @@ class VideoRenderer(
     private var session = 0L
     private var diagnostics = VideoDiagnostics(session)
     @Volatile internal var hevcDecoder: VideoDecoderSupport.Hevc? = null
-    private val worker = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "Wormhole decoder") }
+    private val worker = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "Receiver decoder") }
     // Fields below are confined to worker.
     private val decoderPump = DecoderPump(input)
     private var codecGeneration = -1L
@@ -178,7 +178,7 @@ class VideoRenderer(
             object : DecoderPump.Decoder {
                 override fun drain(render: Boolean) = drainOutput(started, render, measurements)
                 override fun submit(frame: VideoFrameQueue.Frame): Boolean {
-                    Trace.beginSection("Wormhole video input")
+                    Trace.beginSection("Receiver video input")
                     try {
                         val before = System.nanoTime()
                         val index = started.dequeueInputBuffer(0)
@@ -253,7 +253,7 @@ class VideoRenderer(
     }
 
     internal companion object {
-        const val TAG = "Wormhole"
+        const val TAG = "SecondDisplay"
         const val STEADY_MAX_FRAMES = 90
         const val STARTUP_MAX_FRAMES = 120
         /** Queue depth above which decoded output is dropped instead of displayed. */

@@ -2,7 +2,7 @@
 set -euo pipefail
 repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
 ux="$repo_dir/app/src/main/cpp/uxplay/lib"
-test_dir="$(mktemp -d "${TMPDIR:-/tmp}/wormhole-native.XXXXXX")"
+test_dir="$(mktemp -d "${TMPDIR:-/tmp}/seconddisplay-native.XXXXXX")"
 trap 'rm -rf "$test_dir"' EXIT
 "${CC:-clang}" -g -O1 -fsanitize="${SANITIZERS:-undefined}" -fno-omit-frame-pointer -fno-sanitize-recover=all \
   -DPLIST_230 -DTARGET_POSIX -D_XOPEN_SOURCE=700 -D_DARWIN_C_SOURCE \

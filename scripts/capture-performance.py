@@ -18,13 +18,13 @@ PACKAGE = "io.github.swidegit.seconddisplay"
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--serial", help="ADB serial; required if multiple devices are connected")
-    parser.add_argument("--duration", type=int, default=60, help="Seconds, 1–1200 (default: 60)")
+    parser.add_argument("--duration", type=int, default=60, help="Seconds, 1-1200 (default: 60)")
     parser.add_argument("--label", required=True, help="Sender, workload, profile, audio state, Wi-Fi placement")
     parser.add_argument("--trace-seconds", type=int, default=0, help="Optional Perfetto trace, up to 30 seconds")
     parser.add_argument("--output", type=Path, help="New output directory (must not already exist)")
     args = parser.parse_args()
     if not 1 <= args.duration <= 1200 or not 0 <= args.trace_seconds <= min(30, args.duration):
-        parser.error("duration must be 1–1200; trace-seconds must be 0–min(30, duration)")
+        parser.error("duration must be 1-1200; trace-seconds must be 0-min(30, duration)")
     sdk_adb = Path(os.environ.get("ANDROID_HOME", Path.home() / "Library/Android/sdk")) / "platform-tools/adb"
     adb = shutil.which("adb") or (str(sdk_adb) if sdk_adb.exists() else None)
     if not adb:
@@ -83,7 +83,7 @@ def main():
         capture(f"{label}-battery.txt", "shell", "dumpsys", "battery")
 
     log_file = (output / "logcat.txt").open("wb")
-    logcat = subprocess.Popen(command + ["logcat", "-v", "epoch", "-T", "1", "Wormhole:I",
+    logcat = subprocess.Popen(command + ["logcat", "-v", "epoch", "-T", "1", "SecondDisplay:I",
                                        "AndroidRuntime:E", "libc:F", "art:I", "*:S"],
                               stdout=log_file, stderr=subprocess.STDOUT)
     trace = None

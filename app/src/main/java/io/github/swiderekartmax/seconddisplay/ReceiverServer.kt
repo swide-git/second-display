@@ -23,16 +23,16 @@ import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Process-wide manager that owns the native AirPlay server, audio/video renderers,
- * connection history, and reactive state. Shared between [WormholeService] and [MainActivity].
+ * connection history, and reactive state. Shared between [ReceiverService] and [MainActivity].
  */
-object WormholeServer {
-    private const val TAG = "WormholeServer"
+object ReceiverServer {
+    private const val TAG = "ReceiverServer"
     private const val MAX_ART_PX = 1024
 
     private lateinit var appContext: Context
     private lateinit var prefs: SharedPreferences
 
-    lateinit var identity: WormholeIdentity
+    lateinit var identity: ReceiverIdentity
         private set
     lateinit var history: ConnectionHistory
         private set
@@ -150,7 +150,7 @@ object WormholeServer {
     var onIncomingStreamBackgroundCallback: (() -> Unit)? = null
 
     // Server lifecycle internals
-    private val serverExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "Wormhole server") }
+    private val serverExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "Receiver server") }
     private val serverLifecycle = ServerLifecycle(serverExecutor)
     private var lease: ServerLifecycle.Lease? = null
 
@@ -160,7 +160,7 @@ object WormholeServer {
     private val mirrorGeneration = AtomicLong()
 
     // Cover art is decoded off the audio RTP thread; a late decode must not outlive its session.
-    private val artExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "Wormhole cover art") }
+    private val artExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "Receiver cover art") }
     private val artLock = Any()
     private var artGeneration = 0L  // guarded by artLock
 
@@ -173,7 +173,7 @@ object WormholeServer {
         appContext = context.applicationContext
         prefs = appContext.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
-        identity = WormholeIdentity(appContext)
+        identity = ReceiverIdentity(appContext)
         history = ConnectionHistory(appContext)
         _recentConnections.value = history.getRecent()
 
@@ -186,7 +186,7 @@ object WormholeServer {
 
         audioRenderer.audioEnabled = audioEnabled
 
-        val autoSupported = WormholeIdentity.hasOrientationSensor(appContext)
+        val autoSupported = ReceiverIdentity.hasOrientationSensor(appContext)
         val defaultOrientation = ScreenOrientation.LANDSCAPE
         val savedSetting = ScreenOrientation.fromId(
             prefs.getString("orientation_setting", defaultOrientation.id)
@@ -247,7 +247,7 @@ object WormholeServer {
     }
 
     fun setOrientationSetting(setting: ScreenOrientation) {
-        val autoSupported = WormholeIdentity.hasOrientationSensor(appContext)
+        val autoSupported = ReceiverIdentity.hasOrientationSensor(appContext)
         val targetSetting = if (!autoSupported && setting == ScreenOrientation.AUTO) {
             ScreenOrientation.LANDSCAPE
         } else {
@@ -271,7 +271,7 @@ object WormholeServer {
         lastRawWidth = width
         lastRawHeight = height
         lastFps = fps
-        val autoSupported = WormholeIdentity.hasOrientationSensor(appContext)
+        val autoSupported = ReceiverIdentity.hasOrientationSensor(appContext)
         val targetPortrait = when (_orientationSetting.value) {
             ScreenOrientation.PORTRAIT -> true
             ScreenOrientation.LANDSCAPE -> false
@@ -301,7 +301,7 @@ object WormholeServer {
     fun isServerRunning(): Boolean = callbacksEnabled.get()
 
     fun startServer() {
-        check(::appContext.isInitialized) { "WormholeServer must be initialized with context" }
+        check(::appContext.isInitialized) { "ReceiverServer must be initialized with context" }
         if (callbacksEnabled.get()) return
 
         val keyFile = File(appContext.filesDir, "server-key.pem").absolutePath
@@ -335,7 +335,7 @@ object WormholeServer {
                 if (mirrorGeneration.get() == startEvent) {
                     _isMirroring.value = false
                     _clientName.value = null
-                    _statusText.value = "$idleStatus — select it to connect"
+                    _statusText.value = "$idleStatus. Select it to connect"
                 }
             },
             stop = {
@@ -393,7 +393,7 @@ object WormholeServer {
     /** The user left the stream on the device (Back/Home): drop the sender by restarting the receiver. */
     fun disconnectClient(reason: String) {
         if (!_isMirroring.value && !_isAudioStreaming.value) return
-        Log.i("Wormhole", "Disconnecting client: $reason")
+        Log.i("SecondDisplay", "Disconnecting client: $reason")
         restartServer()
     }
 
@@ -408,7 +408,7 @@ object WormholeServer {
         clearNowPlaying()
         _videoAspectRatio.value = null
         _clientName.value = null
-        _statusText.value = "Stream interrupted — reconnect from Screen Mirroring"
+        _statusText.value = "Stream interrupted. Reconnect from Screen Mirroring"
         lease?.let { serverLifecycle.restart(it) }
     }
 
@@ -611,7 +611,7 @@ object WormholeServer {
         lastRawHeight = if (metrics.heightPixels > 0) metrics.heightPixels else 1080
         lastFps = fps
 
-        val autoSupported = WormholeIdentity.hasOrientationSensor(context)
+        val autoSupported = ReceiverIdentity.hasOrientationSensor(context)
         val isSysPortrait = context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT ||
                 lastRawWidth < lastRawHeight
         val targetPortrait = when (_orientationSetting.value) {

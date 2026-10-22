@@ -61,14 +61,14 @@ class DisplayInfoTest {
     fun `device model names no longer drive TV or orientation detection`() {
         // Without a Context there is no UI mode, feature or sensor to inspect: a phone or
         // tablet, whatever its model string, is not a TV and keeps Auto rotation.
-        org.junit.Assert.assertFalse(WormholeIdentity.isTvDevice(null))
-        assertTrue(WormholeIdentity.supportsAutoOrientation(null))
+        org.junit.Assert.assertFalse(ReceiverIdentity.isTvDevice(null))
+        assertTrue(ReceiverIdentity.supportsAutoOrientation(null))
     }
 
     @Test
     fun `default service name is the same on every device`() {
-        assertEquals("Second Display", WormholeIdentity.DEFAULT_SERVICE_NAME)
-        assertEquals("Second Display", WormholeIdentity.sanitizeServiceName("  "))
-        assertEquals("Living Room", WormholeIdentity.sanitizeServiceName(" Living Room "))
+        assertEquals("Second Display", ReceiverIdentity.DEFAULT_SERVICE_NAME)
+        assertEquals("Second Display", ReceiverIdentity.sanitizeServiceName("  "))
+        assertEquals("Living Room", ReceiverIdentity.sanitizeServiceName(" Living Room "))
     }
 }

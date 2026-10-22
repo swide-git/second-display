@@ -6,11 +6,11 @@
  * 16-bit, 1 or 2 channels, no shifted low-order bytes. Malformed input is
  * rejected instead of trusted (bit reads are bounds checked).
  *
- * Part of Wormhole Display (GPLv3).
+ * Part of Second Display (GPLv3), originally written for Wormhole Display.
  */
 
-#ifndef WORMHOLE_ALAC_DECODER_H
-#define WORMHOLE_ALAC_DECODER_H
+#ifndef SECOND_DISPLAY_ALAC_DECODER_H
+#define SECOND_DISPLAY_ALAC_DECODER_H
 
 #include <stddef.h>
 #include <stdint.h>

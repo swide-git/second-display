@@ -9,7 +9,7 @@ object NativeBridge {
         fun onAudioFlush() {}
         fun onClientConnected(name: String)
 
-        /** Any control socket closed — diagnostic only, not a mirror-stop signal. */
+        /** Any control socket closed - diagnostic only, not a mirror-stop signal. */
         fun onClientDisconnected()
 
         /** Verified mirror-stream lifetime; owns renderer state. */
@@ -40,12 +40,12 @@ object NativeBridge {
         fun onStreamError()
     }
 
-    /** Audio codec tags shared with wormhole_jni.c (AirPlay "ct" values; 0 = decoded PCM). */
+    /** Audio codec tags shared with receiver_jni.c (AirPlay "ct" values; 0 = decoded PCM). */
     const val CT_PCM = 0
     const val CT_ALAC = 2
     const val CT_AAC_ELD = 8
 
-    init { System.loadLibrary("wormhole") }
+    init { System.loadLibrary("seconddisplay") }
 
     external fun nativeSetListener(listener: Listener?)
 

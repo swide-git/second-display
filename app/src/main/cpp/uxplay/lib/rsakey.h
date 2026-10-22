@@ -1,5 +1,5 @@
 /**
- *  Android port addition (Wormhole Display): legacy RAOP ("AirTunes") RSA support.
+ *  Android port addition (Second Display, originally Wormhole Display): legacy RAOP ("AirTunes") RSA support.
  *
  *  iTunes / macOS Music stream audio-only with the AirPort Express protocol:
  *  the sender proves the receiver is genuine with an Apple-Challenge header

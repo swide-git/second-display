@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22.1)
-project(wormhole C)
+project(seconddisplay C)
 
 set(UX ${CMAKE_CURRENT_SOURCE_DIR}/uxplay/lib)
 set(DEPS ${CMAKE_CURRENT_SOURCE_DIR}/deps)
@@ -9,7 +9,7 @@ add_compile_options(-ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.)
 
 file(GLOB UX_SOURCES CONFIGURE_DEPENDS ${UX}/*.c ${UX}/llhttp/*.c ${UX}/playfair/*.c ${UX}/mdnsd/*.c)
 
-# UxPlay mirroring core (GPLv3/LGPLv2.1+ — see uxplay/LICENSE.GPLv3).
+# UxPlay mirroring core (GPLv3/LGPLv2.1+ - see uxplay/LICENSE.GPLv3).
 # Discovery uses the bundled internal mDNS responder (mdnsd); the dns_sd
 # (Bonjour/Avahi) backend is intentionally absent.
 add_library(mirror-core STATIC ${UX_SOURCES})
@@ -28,8 +28,8 @@ target_compile_options(mirror-core PRIVATE -w)
 add_library(alac-decoder STATIC ${CMAKE_CURRENT_SOURCE_DIR}/alac/alac_decoder.c)
 target_include_directories(alac-decoder PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/alac)
 
-add_library(wormhole SHARED wormhole_jni.c dmap.c)
-target_link_libraries(wormhole
+add_library(seconddisplay SHARED receiver_jni.c dmap.c)
+target_link_libraries(seconddisplay
     alac-decoder
     mirror-core
     ${DEPS}/plist/lib/${ANDROID_ABI}/libplist-2.0.a

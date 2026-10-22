@@ -35,7 +35,7 @@
         </activity>
 
         <service
-            android:name=".WormholeService"
+            android:name=".ReceiverService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
 

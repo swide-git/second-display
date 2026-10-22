@@ -24,9 +24,9 @@ import kotlinx.coroutines.flow.onEach
  * Persistent Android Foreground Service that keeps the native UxPlay AirPlay
  * receiver alive and discoverable via mDNS even when MainActivity is closed or minimized.
  */
-class WormholeService : Service() {
+class ReceiverService : Service() {
     companion object {
-        private const val TAG = "WormholeService"
+        private const val TAG = "ReceiverService"
         const val CHANNEL_ID = "receiver_service"
         const val NOTIFICATION_ID = 1001
 
@@ -38,7 +38,7 @@ class WormholeService : Service() {
             private set
 
         fun start(context: Context) {
-            val intent = Intent(context, WormholeService::class.java).apply {
+            val intent = Intent(context, ReceiverService::class.java).apply {
                 action = ACTION_START
             }
             // Android 12+ refuses foreground-service starts from the background outside the
@@ -51,10 +51,17 @@ class WormholeService : Service() {
         }
 
         fun stop(context: Context) {
-            val intent = Intent(context, WormholeService::class.java).apply {
+            // Starting a stopped service just to stop it would try to enter the foreground
+            // from the background, which Android 12+ refuses.
+            if (!isRunning) return
+            val intent = Intent(context, ReceiverService::class.java).apply {
                 action = ACTION_STOP
             }
-            context.startService(intent)
+            try {
+                context.startService(intent)
+            } catch (e: IllegalStateException) {
+                Log.w(TAG, "Service stop not allowed now: ${e.message}")
+            }
         }
     }
 
@@ -64,70 +71,74 @@ class WormholeService : Service() {
     override fun onCreate() {
         super.onCreate()
         isRunning = true
-        Log.i(TAG, "Creating WormholeService")
+        Log.i(TAG, "Creating ReceiverService")
 
         createNotificationChannel()
-        // Android 14+ requires the type at runtime to match the manifest declaration.
-        startForeground(
-            NOTIFICATION_ID,
-            buildNotification("Initializing receiver…"),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-        )
+        enterForeground("Initializing receiver…")
 
         val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
-        wakeLock = powerManager?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "wormhole:receiver_wakelock")?.apply {
+        wakeLock = powerManager?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "seconddisplay:receiver")?.apply {
             setReferenceCounted(false)
             acquire()
         }
 
-        WormholeServer.init(applicationContext)
-        // Single launch path: WormholeServer fires this when a mirroring or audio-only session starts while the activity isn't resumed.
-        WormholeServer.onIncomingStreamBackgroundCallback = {
+        ReceiverServer.init(applicationContext)
+        // Single launch path: ReceiverServer fires this when a mirroring or audio-only session starts while the activity isn't resumed.
+        ReceiverServer.onIncomingStreamBackgroundCallback = {
             launchMainActivity()
         }
-        WormholeServer.startServer()
+        ReceiverServer.startServer()
 
         // Observe server state changes to update notification
-        WormholeServer.isMirroring.onEach { mirroring ->
-            val client = WormholeServer.clientName.value
+        ReceiverServer.isMirroring.onEach { mirroring ->
+            val client = ReceiverServer.clientName.value
             val text = if (mirroring) {
                 "Mirroring ${client ?: "client"}"
             } else {
-                WormholeServer.idleStatus
+                ReceiverServer.idleStatus
             }
             updateNotification(text, isMirroring = mirroring)
         }.launchIn(serviceScope)
 
-        WormholeServer.statusText.onEach { status ->
-            if (!WormholeServer.isMirroring.value) {
+        ReceiverServer.statusText.onEach { status ->
+            if (!ReceiverServer.isMirroring.value) {
                 updateNotification(status, isMirroring = false)
             }
         }.launchIn(serviceScope)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) {
-            Log.i(TAG, "Received ACTION_STOP -> stopping service")
+        // A null intent is Android restarting a sticky service after killing the process: only
+        // wanted when the user allowed the receiver to run in the background.
+        val restartWithoutApp = intent == null && !ReceiverServer.runInBackground
+        if (intent?.action == ACTION_STOP || restartWithoutApp) {
+            Log.i(TAG, if (restartWithoutApp) "Sticky restart with background off -> stopping" else "Received ACTION_STOP -> stopping service")
+            ReceiverServer.stopServer()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 stopForeground(STOP_FOREGROUND_REMOVE)
             } else {
                 @Suppress("DEPRECATION")
                 stopForeground(true)
             }
-            stopSelf()
+            // Not stopSelf(): a start sent right after this stop (the user came straight back)
+            // keeps the service alive.
+            stopSelf(startId)
             return START_NOT_STICKY
         }
 
-        WormholeServer.init(applicationContext)
-        WormholeServer.startServer()
-        return START_STICKY
+        // A start may follow a stop that already left the foreground; every
+        // startForegroundService() must be answered with startForeground().
+        enterForeground(ReceiverServer.statusText.value)
+        ReceiverServer.init(applicationContext)
+        ReceiverServer.startServer()
+        return if (ReceiverServer.runInBackground) START_STICKY else START_NOT_STICKY
     }
 
     override fun onDestroy() {
-        Log.i(TAG, "Destroying WormholeService")
+        Log.i(TAG, "Destroying ReceiverService")
         isRunning = false
         serviceScope.cancel()
-        WormholeServer.onIncomingStreamBackgroundCallback = null
+        ReceiverServer.onIncomingStreamBackgroundCallback = null
 
         runCatching {
             if (wakeLock?.isHeld == true) {
@@ -140,6 +151,15 @@ class WormholeService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    private fun enterForeground(contentText: String) {
+        // Android 14+ requires the type at runtime to match the manifest declaration.
+        startForeground(
+            NOTIFICATION_ID,
+            buildNotification(contentText),
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+        )
+    }
 
     private fun launchMainActivity() {
         Log.i(TAG, "Incoming stream active in background: launching MainActivity")

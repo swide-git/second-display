@@ -16,7 +16,7 @@
  *                  16 bits per coefficient
  *     per channel: adaptive Golomb-Rice coded prediction residuals
  *
- * Part of Wormhole Display (GPLv3).
+ * Part of Second Display (GPLv3), originally written for Wormhole Display.
  */
 
 #include <stdlib.h>
