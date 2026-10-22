@@ -7,14 +7,16 @@ import androidx.compose.ui.graphics.Color
 
 /**
  * Second Display colours. The UI follows the wallpaper (Material You) on Android 12+; these
- * orange schemes are the fallback on Android 11 and the brand colours of the launcher icon
+ * orange schemes are the fallback on Android 11. The launcher icon
  * (`res/drawable/ic_launcher_foreground.xml`, `res/values/ic_launcher_background.xml`,
- * `docs/images/second_display_icon.svg`).
+ * `docs/images/second_display_icon.svg`, `tv_banner.png`) uses the same tones: the
+ * light primaryContainer as background, [Accent] and the light primary.
  */
 object Palette {
-    /** Launcher icon background and accent. */
-    val IconBackground = Color(0xFF121214)
+    /** Launcher icon: background, monitor and tablet. */
+    val IconBackground = Color(0xFFFFDCC2)
     val Accent = Color(0xFFFF9F43)
+    val IconForeground = Color(0xFF904D00)
 
     /** Overlays drawn on top of video stay dark whatever the theme. */
     val OverlayScrim = Color(0xCC000000)
