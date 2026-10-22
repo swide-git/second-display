@@ -136,6 +136,10 @@ jobs:
           (cd dist && sha256sum second-display.apk > second-display.apk.sha256)
           cat dist/*.sha256
 
+      - name: Check JNI names survive R8
+        # receiver_jni.c finds Kotlin methods by name; a renamed one only fails at runtime.
+        run: scripts/check-jni-names.sh dist/second-display.apk
+
       - name: Check 16 KB page alignment
         # Google Play withholds apps whose native libraries are not 16 KB aligned from
         # devices with 16 KB memory pages (newer phones), which then report "can't download".

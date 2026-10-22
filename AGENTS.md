@@ -356,7 +356,8 @@ adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
   keeps `NativeBridge` (JNI function names) and `NativeBridge$Listener` with every
   implementation (`receiver_jni.c` calls its methods by name). A new JNI callback or
   `external fun` needs no new rule as long as it lives in those two types; anything
-  else the native side looks up by name does. Check with `dexdump` on the release APK.
+  else the native side looks up by name does. `scripts/check-jni-names.sh <apk>` (also a CI step) checks every `GetMethodID` name and
+  `Java_..._NativeBridge_*` function against the APK's dex.
 - **Launcher icon**: adaptive icon in `mipmap-anydpi-v26/ic_launcher.xml` (vector
   monitor and tablet in the Material You tones of `Palette.kt`: `#FFDCC2` background,
   `#FF9F43` monitor, `#904D00` tablet; scaled to 92 % so the corners stay in the 72 dp

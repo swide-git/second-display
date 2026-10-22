@@ -277,7 +277,6 @@ object ReceiverServer {
         restartServer()
     }
 
-    /** Stored as "publicKey<TAB>name"; base64 keys contain no tab. */
     private fun pairedSenders(): Set<String> = prefs.getStringSet("paired_senders", emptySet()) ?: emptySet()
 
     fun forgetPairedSenders() {
@@ -411,7 +410,7 @@ object ReceiverServer {
                 Log.i(TAG, "HEVC requested=$requestHevc hardware=${renderer.hevcDecoder}")
                 Log.i(TAG, "Starting receiver advertising ${currentDisplay.width}x${currentDisplay.height}@${currentDisplay.refreshRate}Hz (portrait=${_isPortrait.value}, setting=${_orientationSetting.value})")
                 NativeBridge.nativeSetTrustedSenders(
-                    pairedSenders().map { it.substringBefore('\t') }.toTypedArray()
+                    PairedSenders.keys(pairedSenders()).toTypedArray()
                 )
                 val port = NativeBridge.nativeStart(
                     keyFile, identity.deviceIdHex, identity.serviceName,
@@ -691,8 +690,7 @@ object ReceiverServer {
         }
 
         override fun onClientRegistered(publicKey: String, name: String) {
-            val entry = "$publicKey\t$name"
-            val updated = pairedSenders().filterNot { it.substringBefore('\t') == publicKey }.toSet() + entry
+            val updated = PairedSenders.add(pairedSenders(), publicKey, name)
             prefs.edit().putStringSet("paired_senders", updated).apply()
             _pairedSenderCount.value = updated.size
             mainHandler.post { endPairingPrompt() }
