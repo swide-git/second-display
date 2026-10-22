@@ -118,6 +118,10 @@ object ReceiverServer {
     private val hevcFailedThisProcess = AtomicBoolean(false)
     var runInBackground: Boolean = true
         private set
+    /** Standby screen: after a minute idle the dashboard dims to a clock until a stream starts. */
+    var standbyEnabled: Boolean = false
+        private set
+
     /** Picture delay in ms (0..500): lines the picture up with Bluetooth audio, which lags. */
     var pictureDelayMs: Int = 0
         private set
@@ -201,6 +205,7 @@ object ReceiverServer {
         runInBackground = prefs.getBoolean("run_in_background", true)
         floatingWindowEnabled = prefs.getBoolean("floating_window_enabled", true)
         requirePin = prefs.getBoolean("require_pin", false)
+        standbyEnabled = prefs.getBoolean("standby_enabled", false)
         pictureDelayMs = prefs.getInt("picture_delay_ms", 0).coerceIn(0, MAX_PICTURE_DELAY_MS)
         renderer.pictureDelayNanos = pictureDelayMs * 1_000_000L
         _pairedSenderCount.value = pairedSenders().size
@@ -236,6 +241,11 @@ object ReceiverServer {
     fun setDebugOverlayEnabled(enabled: Boolean) {
         debugOverlayEnabled = enabled
         prefs.edit().putBoolean("debug_overlay_enabled", enabled).apply()
+    }
+
+    fun setStandbyEnabled(enabled: Boolean) {
+        standbyEnabled = enabled
+        prefs.edit().putBoolean("standby_enabled", enabled).apply()
     }
 
     fun setPictureDelayMs(ms: Int) {

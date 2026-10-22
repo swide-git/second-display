@@ -311,6 +311,16 @@ adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
   carry `focusRing` so D-pad focus stays visible. Icons come from
   `material-icons-core` plus `AppIcons`; `material-icons-extended` is not needed
   (debug builds are not shrunk and it adds megabytes there).
+- **Standby, battery, TV**: *Standby screen* (`standby_enabled`, off) swaps the
+  dashboard for `StandbyScreen` after `STANDBY_AFTER_MS` without touch, key, stream or
+  pairing code, at window brightness 0.02; the clock drifts every minute against burn-in.
+  `dispatchTouchEvent` and the root `onPreviewKeyEvent` record activity; the first touch
+  or key only wakes. `ComponentActivity.dispatchKeyEvent` is library-restricted (lint
+  error), hence the Compose key hook, which also opens the in-session settings on OK,
+  Enter or Menu (remotes have no long press). `LowBatteryBadge` appears over the
+  picture at 15 % or less when not charging (sticky `ACTION_BATTERY_CHANGED`, read once
+  a minute while mirroring). On TV the dashboard keeps a 48 x 27 dp title-safe margin
+  and *Floating window* is hidden where picture-in-picture is unsupported.
 - **Picture delay (A/V sync)**: mirroring plays audio and video as they arrive, so a
   Bluetooth output (100-300 ms) leaves sound behind the picture. The fix delays the
   picture, not the sound: `DecoderPump` submits a frame only `pictureDelayNanos` after
