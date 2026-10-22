@@ -118,6 +118,17 @@ object ReceiverServer {
     private val hevcFailedThisProcess = AtomicBoolean(false)
     var runInBackground: Boolean = true
         private set
+    /** New senders must enter a 4-digit code shown on this device (AirPlay PIN pairing). */
+    var requirePin: Boolean = false
+        private set
+    private val _pairingCode = MutableStateFlow<String?>(null)
+    /** The code a sender is waiting for, while it waits. */
+    val pairingCode: StateFlow<String?> = _pairingCode.asStateFlow()
+    private val _pairedSenderCount = MutableStateFlow(0)
+    val pairedSenderCount: StateFlow<Int> = _pairedSenderCount.asStateFlow()
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val clearPairingCode = Runnable { endPairingPrompt() }
+
     /** Home while mirroring shrinks the stream into a picture-in-picture window. */
     var floatingWindowEnabled: Boolean = true
         private set
@@ -185,6 +196,8 @@ object ReceiverServer {
         hevcEnabled = prefs.getBoolean("hevc_enabled", false)
         runInBackground = prefs.getBoolean("run_in_background", true)
         floatingWindowEnabled = prefs.getBoolean("floating_window_enabled", true)
+        requirePin = prefs.getBoolean("require_pin", false)
+        _pairedSenderCount.value = pairedSenders().size
         startOnBoot = prefs.getBoolean("start_on_boot", true)
         _resolutionPreset.value = ResolutionPreset.fromId(prefs.getString("resolution_preset", null))
 
@@ -217,6 +230,31 @@ object ReceiverServer {
     fun setDebugOverlayEnabled(enabled: Boolean) {
         debugOverlayEnabled = enabled
         prefs.edit().putBoolean("debug_overlay_enabled", enabled).apply()
+    }
+
+    fun setRequirePin(enabled: Boolean) {
+        if (requirePin == enabled) return
+        requirePin = enabled
+        prefs.edit().putBoolean("require_pin", enabled).apply()
+        // The pw= flag lives in the mDNS record and the PIN in the server: re-announce.
+        restartServer()
+    }
+
+    /** Stored as "publicKey<TAB>name"; base64 keys contain no tab. */
+    private fun pairedSenders(): Set<String> = prefs.getStringSet("paired_senders", emptySet()) ?: emptySet()
+
+    fun forgetPairedSenders() {
+        prefs.edit().remove("paired_senders").apply()
+        NativeBridge.nativeSetTrustedSenders(emptyArray())
+        _pairedSenderCount.value = 0
+    }
+
+    private fun endPairingPrompt() {
+        mainHandler.removeCallbacks(clearPairingCode)
+        if (_pairingCode.value != null) {
+            _pairingCode.value = null
+            if (_statusText.value.startsWith("Code ")) _statusText.value = idleStatus
+        }
     }
 
     fun setFloatingWindowEnabled(enabled: Boolean) {
@@ -335,10 +373,13 @@ object ReceiverServer {
                 ) else null
                 Log.i(TAG, "HEVC requested=$requestHevc hardware=${renderer.hevcDecoder}")
                 Log.i(TAG, "Starting receiver advertising ${currentDisplay.width}x${currentDisplay.height}@${currentDisplay.refreshRate}Hz (portrait=${_isPortrait.value}, setting=${_orientationSetting.value})")
+                NativeBridge.nativeSetTrustedSenders(
+                    pairedSenders().map { it.substringBefore('\t') }.toTypedArray()
+                )
                 val port = NativeBridge.nativeStart(
                     keyFile, identity.deviceIdHex, identity.serviceName,
                     currentDisplay.width, currentDisplay.height, currentDisplay.refreshRate,
-                    renderer.hevcDecoder != null
+                    renderer.hevcDecoder != null, requirePin
                 )
                 check(port > 0) { "Server failed to start ($port)" }
                 if (mirrorGeneration.get() == startEvent) {
@@ -369,6 +410,7 @@ object ReceiverServer {
     }
 
     fun stopServer() {
+        mainHandler.post { endPairingPrompt() }
         callbacksEnabled.set(false)
         callbackGeneration.incrementAndGet()
         lease?.let { serverLifecycle.stop(it) }
@@ -529,6 +571,7 @@ object ReceiverServer {
             // Metadata, art and progress arrive only between these two callbacks.
             clearNowPlaying()
             if (running) {
+                mainHandler.post { endPairingPrompt() }
                 audioRenderer.beginSession(codec)
                 // Audio arriving outside a mirroring session is an AirPlay speaker session
                 // (Music / iTunes on a Mac, or iOS audio-only). Mirroring owns the UI otherwise.
@@ -567,6 +610,7 @@ object ReceiverServer {
         override fun onMirrorRunning(running: Boolean) {
             if (!callbacksEnabled.get()) return
             if (running) {
+                mainHandler.post { endPairingPrompt() }
                 sessionStartTime = System.currentTimeMillis()
                 sessionResolution = ""
                 sessionCodec = ""
@@ -596,6 +640,26 @@ object ReceiverServer {
         }
 
         override fun onStreamError() = requestReconnect()
+
+        override fun onDisplayPin(pin: String) {
+            if (!callbacksEnabled.get()) return
+            mainHandler.post {
+                _pairingCode.value = pin
+                _statusText.value = "Code for ${_clientName.value ?: "the sender"}: $pin"
+                // The sender gives up after about a minute; drop the code with it.
+                mainHandler.removeCallbacks(clearPairingCode)
+                mainHandler.postDelayed(clearPairingCode, 90_000)
+                if (!isActivityResumed) onIncomingStreamBackgroundCallback?.invoke()
+            }
+        }
+
+        override fun onClientRegistered(publicKey: String, name: String) {
+            val entry = "$publicKey\t$name"
+            val updated = pairedSenders().filterNot { it.substringBefore('\t') == publicKey }.toSet() + entry
+            prefs.edit().putStringSet("paired_senders", updated).apply()
+            _pairedSenderCount.value = updated.size
+            mainHandler.post { endPairingPrompt() }
+        }
     }
 
     private fun queryDisplayInfo(context: Context): DisplayInfo {

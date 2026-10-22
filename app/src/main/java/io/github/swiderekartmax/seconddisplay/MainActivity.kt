@@ -77,6 +77,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 data class DisplayInfo(
     val width: Int,
@@ -216,7 +217,17 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(orientationSetting) {
                 updateOrientationMode(orientationSetting)
             }
+            // The hotspot or Wi-Fi can change while the app is open; keep the status card current.
+            LaunchedEffect(Unit) {
+                while (true) {
+                    delay(5_000)
+                    networkDetails = NetworkInfoHelper.getNetworkDetails(this@MainActivity)
+                }
+            }
             var floatingWindowEnabled by remember { mutableStateOf(ReceiverServer.floatingWindowEnabled) }
+            var requirePin by remember { mutableStateOf(ReceiverServer.requirePin) }
+            val pairingCode by ReceiverServer.pairingCode.collectAsState()
+            val pairedSenderCount by ReceiverServer.pairedSenderCount.collectAsState()
             // Keep the floating-window shape in step with the picture; auto-enter only while mirroring.
             LaunchedEffect(mirroring, videoAspectRatio, mirrorBounds, floatingWindowEnabled) {
                 if (pipSupported) setPictureInPictureParams(pictureInPictureParams())
@@ -389,6 +400,13 @@ class MainActivity : ComponentActivity() {
                                 debugOverlayEnabled = enabled
                                 ReceiverServer.setDebugOverlayEnabled(enabled)
                             },
+                            requirePin = requirePin,
+                            onRequirePinChanged = { enabled ->
+                                requirePin = enabled
+                                ReceiverServer.setRequirePin(enabled)
+                            },
+                            pairedSenderCount = pairedSenderCount,
+                            onForgetPairedSenders = { ReceiverServer.forgetPairedSenders() },
                             floatingWindowEnabled = floatingWindowEnabled,
                             onFloatingWindowEnabledChanged = { enabled ->
                                 floatingWindowEnabled = enabled
@@ -427,6 +445,7 @@ class MainActivity : ComponentActivity() {
                                 onDismiss = { ReceiverServer.dismissOrientationNotice() }
                             )
                         }
+                        pairingCode?.let { code -> PairingCodeDialog(code = code, clientName = client) }
                     }
                 }
             }
@@ -593,6 +612,32 @@ class MainActivity : ComponentActivity() {
         /** Started (visible) MainActivity instances; the service may bring a second one forward. */
         var startedActivities = 0
     }
+}
+
+/** The code a sender asks for while pairing; stays up until it pairs, starts streaming or gives up. */
+@Composable
+private fun PairingCodeDialog(code: String, clientName: String?) {
+    AlertDialog(
+        onDismissRequest = {},
+        icon = { Icon(Icons.Filled.Lock, contentDescription = null) },
+        title = { Text("AirPlay code") },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    "Enter this code on ${clientName ?: "your Mac, iPhone or iPad"}",
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    code.toCharArray().joinToString(" "),
+                    style = MaterialTheme.typography.displayLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        },
+        confirmButton = {}
+    )
 }
 
 /** D-pad / keyboard focus ring for clickable rows and tiles (TVs and tablets with keyboards). */
@@ -763,6 +808,14 @@ private fun StatusCard(
                     leadingIcon = { Icon(Icons.Filled.Info, contentDescription = null, modifier = Modifier.size(18.dp)) }
                 )
             }
+            networkDetails.hotspotAddress?.let { address ->
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    "Hotspot is on ($address): a Mac joined to this device's hotspot can connect too, no router needed.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
         }
     }
 }
@@ -846,6 +899,10 @@ private fun DashboardScreen(
     hevcEnabled: Boolean,
     onHevcEnabledChanged: (Boolean) -> Unit,
     onDebugOverlayEnabledChanged: (Boolean) -> Unit,
+    requirePin: Boolean,
+    onRequirePinChanged: (Boolean) -> Unit,
+    pairedSenderCount: Int,
+    onForgetPairedSenders: () -> Unit,
     floatingWindowEnabled: Boolean,
     onFloatingWindowEnabledChanged: (Boolean) -> Unit,
     runInBackground: Boolean,
@@ -863,8 +920,11 @@ private fun DashboardScreen(
     onQuit: () -> Unit
 ) {
     var showNameDialog by remember { mutableStateOf(false) }
+    var showReportDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val configuration = LocalConfiguration.current
     val context = LocalContext.current
+    var lastRunCrashed by remember { mutableStateOf(ProblemReport.hasLastCrash(context)) }
     val appVersion = remember(context) {
         runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.1.0-dev"
@@ -1022,12 +1082,39 @@ private fun DashboardScreen(
                 onClick = { showNameDialog = true },
                 trailing = { TextButton(onClick = { showNameDialog = true }) { Text("Rename") } }
             )
+            SwitchRow(
+                title = "Require a code",
+                supporting = if (requirePin) "A new Mac, iPhone or iPad enters a 4-digit code shown here, once"
+                             else "Anyone on this network can connect",
+                icon = Icons.Filled.Lock,
+                checked = requirePin,
+                onToggle = { onRequirePinChanged(!requirePin) }
+            )
+            if (requirePin && pairedSenderCount > 0) {
+                SettingRow(
+                    title = "Paired senders",
+                    supporting = if (pairedSenderCount == 1) "1 device connects without the code"
+                                 else "$pairedSenderCount devices connect without the code",
+                    icon = Icons.Filled.Delete,
+                    onClick = onForgetPairedSenders,
+                    trailing = { TextButton(onClick = onForgetPairedSenders) { Text("Forget") } }
+                )
+            }
             SettingRow(
                 title = "Restart receiver",
                 supporting = "Try this if it does not show up on your Mac or iPhone",
                 icon = Icons.Filled.Refresh,
                 onClick = onRestartServer,
                 trailing = { TextButton(onClick = onRestartServer) { Text("Restart") } }
+            )
+            SettingRow(
+                title = "Report a problem",
+                supporting = if (lastRunCrashed) "The app stopped unexpectedly last time. Send the details"
+                             else "Diagnostics for a GitHub issue",
+                icon = Icons.Filled.Warning,
+                onClick = { showReportDialog = true },
+                titleColor = if (lastRunCrashed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                trailing = { TextButton(onClick = { showReportDialog = true }) { Text("Report") } }
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
             InfoRow("Display", "${displayInfo.width} × ${displayInfo.height} @ ${displayInfo.refreshRate} Hz (${displayInfo.aspectRatioLabel})")
@@ -1179,6 +1266,53 @@ private fun DashboardScreen(
                 }
             }
         }
+    }
+
+    if (showReportDialog) {
+        // Builds the report off the main thread, then copies it and opens GitHub or the share sheet.
+        fun deliver(share: Boolean) {
+            showReportDialog = false
+            scope.launch {
+                val report = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    ProblemReport.build(context)
+                }
+                val crashed = lastRunCrashed
+                if (share) {
+                    val send = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_SUBJECT, "Second Display problem report")
+                        putExtra(Intent.EXTRA_TEXT, report)
+                    }
+                    runCatching { context.startActivity(Intent.createChooser(send, "Share the report")) }
+                } else {
+                    context.getSystemService(android.content.ClipboardManager::class.java)
+                        ?.setPrimaryClip(android.content.ClipData.newPlainText("Second Display report", report))
+                    android.widget.Toast.makeText(context, "Diagnostics copied. Paste them into the issue", android.widget.Toast.LENGTH_LONG).show()
+                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, ProblemReport.issueUri(context, crashed))) }
+                }
+                ProblemReport.clearLastCrash(context)
+                lastRunCrashed = false
+            }
+        }
+        AlertDialog(
+            onDismissRequest = { showReportDialog = false },
+            icon = { Icon(Icons.Filled.Warning, contentDescription = null) },
+            title = { Text("Report a problem") },
+            text = {
+                Text(
+                    "The report holds the app version, device model, Android version, the last crash and " +
+                        "this app's recent log, which includes the receiver name, sender names and network " +
+                        "addresses. Nothing is sent automatically: you choose where it goes."
+                )
+            },
+            confirmButton = { TextButton(onClick = { deliver(share = false) }) { Text("GitHub issue") } },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { showReportDialog = false }) { Text("Cancel") }
+                    TextButton(onClick = { deliver(share = true) }) { Text("Share…") }
+                }
+            }
+        )
     }
 
     if (showNameDialog) {

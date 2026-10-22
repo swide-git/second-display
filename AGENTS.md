@@ -271,6 +271,8 @@ adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
   defaults to 4 KB. Without it Google Play withholds the app from devices with 16 KB
   memory pages, which report "can't download" (a Galaxy S26 Ultra did). CI checks
   `llvm-readelf -lW` and `zipalign -c -P 16` on every build.
+- **Dependencies**: Compose BOM 2026.06.01 and activity-compose 1.13.0 are the newest
+  that build with AGP 8.9 and compileSdk 36; later BOMs need AGP 9.1 and compileSdk 37.
 - **Platform rules (targetSdk 36)**: `startForeground` must pass
   `FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE` (manifest type, Android 14); the
   service start is wrapped because Android 12+ can refuse background starts;
@@ -304,8 +306,36 @@ adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
   *Recent connections* and *This receiver*; two columns when the window is at least
   600 dp wide in landscape (or 840 dp in any orientation). Clickable rows and tiles
   carry `focusRing` so D-pad focus stays visible. Icons come from
-  `material-icons-core` plus `AppIcons`; do not add `material-icons-extended`
-  (megabytes of dex without R8).
+  `material-icons-core` plus `AppIcons`; `material-icons-extended` is not needed
+  (debug builds are not shrunk and it adds megabytes there).
+- **Require a code (AirPlay PIN)**: off by default (`require_pin`). On: `dnssd_init`
+  gets `pin_pw=1` (TXT `pw=true`, RAOP `sf=0x8c`) and `raop_set_plist(raop, "pin", 0)`
+  draws a random code per pairing. `cb_display_pin` → `onDisplayPin` shows it
+  (`PairingCodeDialog`, status text, notification; brings the app forward like a
+  stream). After pairing `cb_register_client` → `onClientRegistered` stores the sender's
+  base64 ed25519 key (`paired_senders`, "key<TAB>name"); `nativeSetTrustedSenders` loads
+  them before `nativeStart`, and `cb_check_register` lets them skip the code. Toggling
+  restarts the server because `pw=` is in the mDNS record.
+- **Notification, tile, hotspot hint**: the service notification has **Disconnect**
+  (`ACTION_DISCONNECT` → `disconnectClient`, only during a session) and **Stop**
+  (`ACTION_STOP`). `ReceiverTileService` (Quick Settings) shows `ReceiverService.isRunning`;
+  a tap stops the receiver or opens the app, because starting a foreground service from a
+  tile is not reliably allowed. The service calls `ReceiverTileService.refresh` on create
+  and destroy. `NetworkInfoHelper.getHotspotAddress` finds the soft AP by interface name
+  (`ap*`, `swlan*`, `softap*`); the status card then says a Mac can join the hotspot.
+  The dashboard refreshes network details every 5 s.
+- **Problem reports**: `SecondDisplayApp` installs `ProblemReport`'s uncaught-exception
+  recorder (`files/last-crash.txt`, then the default handler). *Report a problem* builds
+  the report off the main thread: summary (version, device, Android, page size), the last
+  crash and `logcat -d` (an app reads only its own entries), copies it and opens a
+  prefilled GitHub issue, or shares it. Nothing is sent automatically; keep it that way,
+  the privacy policy says no data is collected.
+- **R8**: release builds are minified and resource-shrunk (about 6.7 MB instead of
+  28 MB); the App Bundle carries the mapping file for Play. `app/proguard-rules.pro`
+  keeps `NativeBridge` (JNI function names) and `NativeBridge$Listener` with every
+  implementation (`receiver_jni.c` calls its methods by name). A new JNI callback or
+  `external fun` needs no new rule as long as it lives in those two types; anything
+  else the native side looks up by name does. Check with `dexdump` on the release APK.
 - **Launcher icon**: adaptive icon in `mipmap-anydpi-v26/ic_launcher.xml` (vector
   monitor and tablet in the Material You tones of `Palette.kt`: `#FFDCC2` background,
   `#FF9F43` monitor, `#904D00` tablet; scaled to 92 % so the corners stay in the 72 dp

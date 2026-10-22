@@ -32,6 +32,7 @@ class ReceiverService : Service() {
 
         const val ACTION_START = "io.github.swiderekartmax.seconddisplay.action.START"
         const val ACTION_STOP = "io.github.swiderekartmax.seconddisplay.action.STOP"
+        const val ACTION_DISCONNECT = "io.github.swiderekartmax.seconddisplay.action.DISCONNECT"
 
         @Volatile
         var isRunning = false
@@ -72,6 +73,7 @@ class ReceiverService : Service() {
         super.onCreate()
         isRunning = true
         Log.i(TAG, "Creating ReceiverService")
+        ReceiverTileService.refresh(this)
 
         createNotificationChannel()
         enterForeground("Initializing receiver…")
@@ -90,6 +92,9 @@ class ReceiverService : Service() {
         ReceiverServer.startServer()
 
         // Observe server state changes to update notification
+        ReceiverServer.isAudioStreaming.onEach {
+            updateNotification(ReceiverServer.statusText.value, isMirroring = ReceiverServer.isMirroring.value)
+        }.launchIn(serviceScope)
         ReceiverServer.isMirroring.onEach { mirroring ->
             val client = ReceiverServer.clientName.value
             val text = if (mirroring) {
@@ -108,6 +113,11 @@ class ReceiverService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_DISCONNECT) {
+            // Notification button: end the session, keep the receiver.
+            ReceiverServer.disconnectClient("notification")
+            return if (ReceiverServer.runInBackground) START_STICKY else START_NOT_STICKY
+        }
         // A null intent is Android restarting a sticky service after killing the process: only
         // wanted when the user allowed the receiver to run in the background.
         val restartWithoutApp = intent == null && !ReceiverServer.runInBackground
@@ -137,6 +147,7 @@ class ReceiverService : Service() {
     override fun onDestroy() {
         Log.i(TAG, "Destroying ReceiverService")
         isRunning = false
+        ReceiverTileService.refresh(this)
         serviceScope.cancel()
         ReceiverServer.onIncomingStreamBackgroundCallback = null
 
@@ -218,11 +229,28 @@ class ReceiverService : Service() {
             .setContentIntent(pendingIntent)
             .setOngoing(true)
 
+        // Disconnect during a session; Stop turns the receiver off until the app is opened again.
+        if (ReceiverServer.isMirroring.value || ReceiverServer.isAudioStreaming.value) {
+            builder.addAction(serviceAction(ACTION_DISCONNECT, "Disconnect", requestCode = 1))
+        }
+        builder.addAction(serviceAction(ACTION_STOP, "Stop", requestCode = 2))
+
         if (isMirroring) {
             builder.setFullScreenIntent(pendingIntent, true)
         }
 
         return builder.build()
+    }
+
+    private fun serviceAction(action: String, title: String, requestCode: Int): Notification.Action {
+        val intent = PendingIntent.getService(
+            this, requestCode,
+            Intent(this, ReceiverService::class.java).setAction(action),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        return Notification.Action.Builder(
+            android.graphics.drawable.Icon.createWithResource(this, R.drawable.ic_notification), title, intent
+        ).build()
     }
 
     private fun updateNotification(contentText: String, isMirroring: Boolean) {
