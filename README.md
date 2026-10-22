@@ -22,6 +22,19 @@ Second Display is an independent community project and is not affiliated with Ap
 
 ---
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/images/phone-dashboard.jpg" width="240" alt="Dashboard: ready to connect, resolution and orientation tiles, settings" />
+  &nbsp;
+  <img src="docs/images/phone-resolution.jpg" width="240" alt="Resolution menu with native, percentage and common sizes" />
+  &nbsp;
+  <img src="docs/images/phone-receiver.jpg" width="240" alt="Recent connections and receiver details" />
+</p>
+<p align="center"><sub>Galaxy S26 Ultra, dark mode, Material You colours from the wallpaper.</sub></p>
+
+---
+
 ## Features
 
 - **Shows up natively on Mac, iPhone and iPad**, under a name you choose (`_airplay._tcp` and `_raop._tcp` on port 7000).
