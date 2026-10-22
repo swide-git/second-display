@@ -283,8 +283,10 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
   monitor and tablet in the Material You tones of `Palette.kt`: `#FFDCC2` background,
   `#FF9F43` monitor, `#904D00` tablet; scaled to 92 % so the corners stay in the 72 dp
   visible area; monochrome layer for themed icons). The TV banner and the 512 px Play
-  icon (`docs/images/second_display_icon.png`, square, 32-bit) use the same design. The PNG mipmaps are only legacy fallbacks; the source design
-  is `docs/images/second_display_icon.svg`.
+  icon (`docs/images/second_display_icon.png`, square, 32-bit) use the same design, as
+  does the 1024x500 Play feature graphic (`docs/images/play_feature_graphic.png`). The
+  PNG mipmaps are only legacy fallbacks; the source design is
+  `docs/images/second_display_icon.svg`.
 - **Package or class renames**: the JNI functions in `wormhole_jni.c`
   (`Java_io_github_swiderekartmax_seconddisplay_NativeBridge_*`) and the
   `FindClass("io/github/swiderekartmax/seconddisplay/NativeBridge$Listener")` string encode
