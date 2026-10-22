@@ -55,14 +55,17 @@ Second Display is an independent community project and is not affiliated with Ap
 
 ## Requirements
 
-| | |
-|---|---|
-| **Android** | 11 or newer (API 30+); built for Android 16 (targetSdk 36) |
-| **CPU** | 64-bit ARM (`arm64-v8a`), i.e. practically every phone and tablet from recent years |
-| **Network** | Device and sender on the **same Wi-Fi network** (5 GHz strongly recommended), or the sender joined to the device's own **hotspot** |
-| **Sender** | Mac, iPhone or iPad (Screen Mirroring / AirPlay) |
+- **Android**: 11 or newer (API 30+); built for Android 16 (targetSdk 36), 16 KB memory pages supported.
+- **CPU**: 64-bit ARM (`arm64-v8a`), i.e. practically every phone and tablet from recent years.
+- **Network**: device and sender on the **same Wi-Fi network** (5 GHz strongly recommended), or the sender joined to the device's own **hotspot**.
+- **Sender**: Mac, iPhone or iPad (Screen Mirroring / AirPlay).
 
-Tested on a Xiaomi Pad (Android 14, HyperOS, 2000×1200) with a MacBook as the sender. Android 15 and 16 are supported by the code but not yet tested on a device; reports are welcome.
+Tested with a MacBook as the sender on:
+
+- **Xiaomi Redmi Pad** (Android 14, HyperOS, 2000×1200)
+- **Samsung Galaxy S26 Ultra** (One UI, 1440×3120)
+
+Reports from other devices are welcome.
 
 ---
 
