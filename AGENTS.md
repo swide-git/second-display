@@ -69,7 +69,11 @@ adb shell am start -n io.github.swidegit.seconddisplay/io.github.swiderekartmax.
 ```
 
 The device is reachable over ADB via USB or wireless debugging. Device and sender
-must share a Wi-Fi LAN (mDNS does not cross the USB cable).
+must share a local network: the same Wi-Fi, or the sender joined to the device's own
+hotspot. `mdnsd.c` advertises on every local IPv4 link (cellular, VPN and CLAT
+skipped), rescanning every 3 s. USB tethering to a Mac only works where the device
+offers NCM (`tetherableNcmRegexs` in `dumpsys tethering`); RNDIS, the default on many
+devices (Xiaomi Redmi Pad among them), has no macOS driver.
 
 Installing on a real device:
 

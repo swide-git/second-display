@@ -18,6 +18,7 @@ marked "Android JNI addition").
 | `dnssdint.h` / `mdnsd/dnssd_mdnsd.c` | Advertise `et=0,1` + `ek=1` (RSA) for legacy audio clients. |
 | `global.h` / `mdnsd/dnssd_mdnsd.c` | Advertise an AirPort-Express `am=` on the RAOP record (audio auth selection) while `_airplay` keeps `AppleTV3,2`. |
 | `rsakey.c` / `rsakey.h` (new) | AirPort Express RSA key: Apple-Challenge signing (PKCS#1 v1.5) and rsaaeskey decryption (RSA-OAEP), plus padding-tolerant base64. |
+| `mdnsd/mdnsd.c` | Serve every local IPv4 link instead of the one multicast routes to: join the group on each up, multicast, non point-to-point interface (cellular `rmnet`/`ccmni`, VPN and CLAT skipped), learn the arrival link with `IP_PKTINFO`, answer and announce per link with that link's A record, rescan every 3 s and announce on new links. A phone with mobile data otherwise advertised on the cellular interface and its hotspot stayed silent. IPv6 is unchanged (one link-local scope). |
 | `mdnsd/dnssd_mdnsd.c` | Build a unique mDNS hostname from `hwaddr` instead of `gethostname()`, which returns "localhost" on Android and caused LAN collisions and misrouted connections across multiple receivers. |
 
 These are deliberate correctness changes. No upstream-version claim is made;

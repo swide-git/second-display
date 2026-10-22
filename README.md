@@ -14,7 +14,7 @@ Second Display makes an Android device show up in **Control Center → Screen Mi
 
 Windows and Linux are not supported. Windows finds wireless displays over Wi-Fi Direct, which an ordinary Android app cannot offer; an earlier Miracast receiver was removed after Windows could not see it.
 
-It is an ordinary app: **no root, no cloud, no account**. It only talks to devices on your local Wi-Fi.
+It is an ordinary app: **no root, no cloud, no account**. It only talks to devices on your local network.
 
 Second Display is a fork of [Wormhole Display](https://github.com/pgodlews/wormhole-display) by Piotr Godlewski, which was built for Meta Portal devices (Android 9-10). This fork targets current Android phones and tablets instead; Portals are not supported by this build. See [What this fork changes](#what-this-fork-changes).
 
@@ -46,7 +46,7 @@ Second Display is an independent community project and is not affiliated with Ap
 |---|---|
 | **Android** | 11 or newer (API 30+); built for Android 16 (targetSdk 36) |
 | **CPU** | 64-bit ARM (`arm64-v8a`), i.e. practically every phone and tablet from recent years |
-| **Network** | Device and sender on the **same Wi-Fi network** (5 GHz strongly recommended) |
+| **Network** | Device and sender on the **same Wi-Fi network** (5 GHz strongly recommended), or the sender joined to the device's own **hotspot** |
 | **Sender** | Mac, iPhone or iPad (Screen Mirroring / AirPlay) |
 
 Tested on a Xiaomi Pad (Android 14, HyperOS, 2000×1200) with a MacBook as the sender. Android 15 and 16 are supported by the code but not yet tested on a device; reports are welcome.
@@ -132,7 +132,7 @@ During a session, **long press on the picture** for stats, speaker, resolution, 
 
 | Symptom | Cause and fix |
 |---|---|
-| Device not listed in Screen Mirroring | Not on the same network, or the network isolates clients (common on office and guest Wi-Fi). Try **This receiver → Restart**. |
+| Device not listed in Screen Mirroring | Not on the same network, or the network isolates clients (common on office and guest Wi-Fi). Try **This receiver → Restart**, or turn on the device's hotspot and join it from the Mac: no router involved. |
 | Session drops or the picture stutters | Usually the Wi-Fi link: 2.4 GHz is slow and crowded, and every frame crosses it twice (sender → router → device). Move both to **5 GHz** and/or pick a lower **Preferred Resolution**. |
 | Picture freezes after a while, app gone | The system closed it. See [Keep it alive](#3-keep-it-alive-xiaomi-samsung-huawei-oneplus-and-others). |
 | Black bars around the picture | The chosen resolution has a different aspect than the panel. Pick **Native** or a percentage. |
