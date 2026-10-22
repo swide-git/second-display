@@ -20,5 +20,5 @@ internal object VideoDecoderSupport {
                         .areSizeAndRateSupported(width, height, fps.toDouble())
                 }.getOrDefault(false)
         }?.let { Hevc(it.name, width, height) }
-    }.onFailure { Log.w("Wormhole", "HEVC capability query failed", it) }.getOrNull()
+    }.onFailure { Log.w("SecondDisplay", "HEVC capability query failed", it) }.getOrNull()
 }

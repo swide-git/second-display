@@ -20,25 +20,25 @@ are deliberately unsupported (see "Windows and Linux" below).
 ## Repo layout
 
 ```
-app/src/main/cpp/uxplay/lib/              vendored UxPlay core (DO NOT casually edit — see below)
+app/src/main/cpp/uxplay/lib/              vendored UxPlay core (DO NOT casually edit - see below)
 app/src/main/cpp/uxplay/lib/llhttp/       bundled HTTP parser (MIT)
 app/src/main/cpp/uxplay/lib/playfair/     FairPlay handshake crypto
 app/src/main/cpp/uxplay/lib/mdnsd/        embedded mDNS responder (the Bonjour advertiser)
-app/src/main/cpp/wormhole_jni.c           JNI shim: server lifecycle + all raop callbacks
+app/src/main/cpp/receiver_jni.c           JNI shim: server lifecycle + all raop callbacks
 app/src/main/cpp/dmap.c                   DMAP parser for now-playing metadata (title/artist/album/year)
 app/src/main/cpp/deps/                    committed prebuilt static libs (openssl, plist)
 app/src/main/java/io/github/swiderekartmax/seconddisplay/
     MainActivity.kt                       Compose dashboard + video surface
     Theme.kt, Palette.kt                  Material You theme (wallpaper colours) and the orange fallback scheme
     AppIcons.kt                           the few Material icons missing from material-icons-core, as path data
-    WormholeService.kt                    foreground service: keeps the receiver discoverable, boot autostart
-    WormholeServer.kt                     process-wide owner of the native server, renderers and UI state
+    ReceiverService.kt                    foreground service: keeps the receiver discoverable, boot autostart
+    ReceiverServer.kt                     process-wide owner of the native server, renderers and UI state
     NativeBridge.kt                       JNI declarations
     ScreenOrientation.kt                  portrait/landscape/auto orientation modes and model helpers
     VideoFrameQueue.kt, VideoRenderer.kt  compressed-frame queue → MediaCodec → Surface (H.264/HEVC)
     AudioRenderer.kt                      AAC-ELD / PCM decode → AudioTrack (44.1 kHz)
     NowPlaying.kt                         track metadata + extrapolated position for audio-only sessions
-    WormholeIdentity.kt                   persisted deviceid, service name, Wi-Fi multicast lock
+    ReceiverIdentity.kt                   persisted deviceid, service name, Wi-Fi multicast lock
 scripts/build.sh                          build APK → dist/second-display.apk
 scripts/build-deps.sh                     rebuild the native deps (rarely needed)
 scripts/test-native.sh                    host regression tests for the vendored mirror loop and the DMAP parser
@@ -75,7 +75,7 @@ Installing on a real device:
 
 - **Never install while a session is running**: the install force-stops the app
   and drops the sender. Check first that the newest of `mirror video started` /
-  `mirror video stopped` in `adb logcat -d -s Wormhole` is `stopped`.
+  `mirror video stopped` in `adb logcat -d -s SecondDisplay` is `stopped`.
 - **Play Protect** rejects debug APKs over USB (`INSTALL_FAILED_VERIFICATION_FAILURE`).
   Switch `settings put global verifier_verify_adb_installs 0` only for the install
   and restore it to `1` right after.
@@ -94,8 +94,8 @@ Installing on a real device:
    `srcvers=220.68`, `features=0x5A7FFEE6,0x0`. This is what populates the
    sender's picker.
 2. Client connects to TCP 7000, does `GET /info` (RTSP-style, **with CSeq**),
-   then ed25519 `pair-verify` (transient — no PIN with our feature bits).
-3. `POST /fp-setup` × 2 — FairPlay SAP handshake (in `playfair/`).
+   then ed25519 `pair-verify` (transient - no PIN with our feature bits).
+3. `POST /fp-setup` × 2 - FairPlay SAP handshake (in `playfair/`).
 4. `SETUP` negotiates streams: video over TCP 7100 ("mirror data"), timing/control
    UDP 7011/7001/7101. Then `RECORD` starts the stream.
 5. Video arrives AES-128-CTR encrypted; the core decrypts and calls
@@ -123,7 +123,7 @@ the "AirPlay only" commit.
 Device seen by the sender (run on the Mac):
 
 ```bash
-dns-sd -B _airplay._tcp local.        # must list the service name, e.g. "Wormhole Plus"
+dns-sd -B _airplay._tcp local.        # must list the service name, e.g. "Second Display"
 dns-sd -B _raop._tcp local.           # must list "<DEVICEID>@<service name>"
 ```
 
@@ -141,21 +141,21 @@ height/maxFPS. A 409 means another client is already connected.
 Logs on the device:
 
 ```bash
-adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
+adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
 ```
 
-## Troubleshooting — every one of these was hit for real
+## Troubleshooting: every one of these was hit for real
 
 | Symptom | Cause | Fix / notes |
 |---|---|---|
 | Plain `curl http://…:7000/info` hangs, empty reply | The core drops requests **without a CSeq header** unless HLS support is on | Probe with the RTSP+CSeq recipe above, not curl |
 | Crash: `assertion "raop->dnssd" failed` on first /info | `/info` reads TXT records from the C dnssd object | `dnssd_init` + `dnssd_register_*` must complete before HTTP starts (done in `nativeStart`) |
 | Picker shows the device, connect fails instantly | Advertised `pk` ≠ the server's actual ed25519 key | Always advertise `raop_get_pk_str()` output; never a random/persisted key |
-| Mac mirrors at 1920×1080, looks wrong on the panel | UxPlay defaults advertise 1920×1080@30; **macOS mirrors at whatever you advertise** | `raop_set_plist(raop,"width"/"height"/"refreshRate"/"maxFPS", …)` — done from real display metrics in `nativeStart` |
+| Mac mirrors at 1920×1080, looks wrong on the panel | UxPlay defaults advertise 1920×1080@30; **macOS mirrors at whatever you advertise** | `raop_set_plist(raop,"width"/"height"/"refreshRate"/"maxFPS", …)` - done from real display metrics in `nativeStart` |
 | App not in the launcher | Missing launcher icon: some launchers hide icon-less apps | Keep `android:icon="@mipmap/ic_launcher"` in the manifest |
 | Re-pairing a running app via `am start … --es` silently does nothing | Standard-launchMode activities don't get `onNewIntent` when already on top | `android:launchMode="singleTop"` (already set) |
 | Stream is live (decoders started) but the app stays behind the launcher | Android 10 blocks background activity starts; logcat shows `Background activity start … isBgStartWhitelisted: false` | Needs "Display over other apps" (`SYSTEM_ALERT_WINDOW` appop). The dashboard's *Open when a stream starts* row links to it. A new `applicationId` starts without the grant |
-| mDNS advertising works on desktop Java but not on device | Android drops multicast without a `WifiManager.MulticastLock`; also needs `CHANGE_WIFI_MULTICAST_STATE` | `WormholeIdentity` holds the multicast lock — it must be held while mdnsd runs |
+| mDNS advertising works on desktop Java but not on device | Android drops multicast without a `WifiManager.MulticastLock`; also needs `CHANGE_WIFI_MULTICAST_STATE` | `ReceiverIdentity` holds the multicast lock - it must be held while mdnsd runs |
 | Why not `NsdManager` for Bonjour? | It cannot publish TXT records before API 31; this build supports API 30 | Native `mdnsd` is used instead (and is required for /info anyway) |
 | Native link errors: `dnssd_private_init`, `dnssd_get_*_txt` undefined | Those symbols live in a dnssd *backend*; you must compile exactly one (`mdnsd/`) | `${UX}/mdnsd/*.c` is in the CMake glob |
 | Stale native builds after adding/removing .c files | CMake `file(GLOB)` result is cached | The glob uses `CONFIGURE_DEPENDS`; if it still looks stale, `rm -rf app/build/intermediates/cxx app/.cxx` then rebuild |
@@ -168,16 +168,16 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
 
 - **Advertised device parameters** (model, srcvers, features, ports): TXT records
   are built by the vendored `dnssd` from `lib/dnssdint.h` constants; geometry comes
-  from `raop_set_plist` in `wormhole_jni.c`. If a sender update breaks
-  compatibility, these strings/bitmasks are the knobs — compare against current
+  from `raop_set_plist` in `receiver_jni.c`. If a sender update breaks
+  compatibility, these strings/bitmasks are the knobs - compare against current
   UxPlay upstream. They are protocol values: never rebrand them.
-- **Ports**: RTSP 7000, mirror data TCP 7100, UDP 7011/7001/7101 — set in
+- **Ports**: RTSP 7000, mirror data TCP 7100, UDP 7011/7001/7101 - set in
   `nativeStart`. The mDNS registration must match.
 - **Version indicator**: `MainActivity` shows `versionName` in the top app bar
   (it becomes *Update to vX.Y.Z* when a newer release exists) and in *This receiver*, and fetches `releases/latest` from `api.github.com` once
   per dashboard composition. This is the app's only request outside the LAN; keep
   README "Privacy and security" in sync if that changes.
-- **Audio**: `cb_audio_process` in `wormhole_jni.c` delivers decrypted audio to
+- **Audio**: `cb_audio_process` in `receiver_jni.c` delivers decrypted audio to
   `AudioRenderer`. Mirroring and iOS audio-only are AAC-ELD (`ct=8`, spf 480);
   legacy RAOP audio (iTunes / older macOS / some Android senders, via `ANNOUNCE`)
   is ALAC (`ct=2`, spf 352), decoded in-process by `app/src/main/cpp/alac/` to
@@ -193,7 +193,7 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
   answers `Apple-Challenge` and dispatches `ANNOUNCE`; `raop_handlers.h` parses
   the SDP (RSA-OAEP AES key, ALAC fmtp) and the Transport-header SETUP. The RAOP
   record advertises `et=0,1 ek=1 am=AirPort4,107`. **Modern macOS Music does not
-  use this path** — it sends FairPlay SAP v2.5 (`fp-setup` version `0x02`), which
+  use this path** - it sends FairPlay SAP v2.5 (`fp-setup` version `0x02`), which
   playfair cannot answer and no open code implements; see `docs/uxplay-patches.md`.
   Do not spend time trying to make macOS Music audio work from the receiver.
 - **H.265**: optional experimental dashboard setting (off by default). Bit 42 is
@@ -208,7 +208,7 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
   identical, and confirm `negotiated video codec` in logcat on both runs.
 - **Screen orientation & rotation**:
   `ScreenOrientation` exposes `LANDSCAPE`, `PORTRAIT`, and `AUTO`. `AUTO`
-  (accelerometer rotation) is offered when `WormholeIdentity.supportsAutoOrientation()`
+  (accelerometer rotation) is offered when `ReceiverIdentity.supportsAutoOrientation()`
   finds an accelerometer and the device is not a TV (UI mode or leanback/television
   feature). Do not detect devices by model-name substrings: upstream's Portal
   heuristics ("Go", "+", "TV" in `Build.MODEL`) misfired on ordinary phones and
@@ -219,7 +219,7 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
   (`disconnectClient("orientation_changed")`) and restarts the native receiver to
   re-advertise transposed dimensions in RTSP `/info`.
 - **Preferred resolution**: `ResolutionPreset` (native, fixed 16:10 / 16:9 sizes,
-  80/64/50 %) feeds `scaledDisplayInfo()` in `WormholeServer`, which every
+  80/64/50 %) feeds `scaledDisplayInfo()` in `ReceiverServer`, which every
   `computeDisplayInfo` call goes through. A change reuses the orientation path
   (`applyOrientation(..., resolutionChange = true)`), so the notice reads
   "Resolution Changed". `NATIVE` must stay exactly the panel size (no rounding);
@@ -230,10 +230,10 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
   drops the prediction chain, the receiver cannot request an IDR, and the session
   ends 2 s later. Catch-up rendering (`CATCH_UP_DEPTH`, `CATCH_UP_MAX_FREEZE_NS`)
   lives in `drainOutput`. Details in `docs/architecture.md`.
-- **Wi-Fi lock**: `WormholeIdentity.holdWifiLock()` / `releaseWifiLock()` sit next to
+- **Wi-Fi lock**: `ReceiverIdentity.holdWifiLock()` / `releaseWifiLock()` sit next to
   the multicast lock in the server lease. `adb shell cmd wifi force-low-latency-mode`
   is not available to the shell user on Android 14, so the app lock is the only way
-  to stop the radio dozing. Verify with `adb shell dumpsys wifi | grep -i wormhole`.
+  to stop the radio dozing. Verify with `adb shell dumpsys wifi | grep -i seconddisplay`.
 - **In-session settings**: a transparent `pointerInput` box over the `SurfaceView`
   opens `MirrorSettingsDialog` on long press. Stats overlay and speaker apply live;
   resolution and HEVC restart the receiver. Back inside the dialog only closes it.
@@ -244,6 +244,12 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
   surface is a separate layer and does not follow Compose layer transforms. The
   codec keeps its own buffer size, so a large view does not allocate large buffers.
   Zoom resets when the picture aspect changes and is never sent to the sender.
+- **Receiver lifetime**: `MainActivity.onStart` starts `ReceiverService`; `onStop`
+  (not `onDestroy`, which may come hours later) stops the service and the server when
+  "Run in background" is off and no other `MainActivity` is visible. The service is
+  `START_STICKY` only with background on, and a sticky restart with background off
+  stops itself. The close button in the top bar always stops both and calls
+  `finishAndRemoveTask()`.
 - **Platform rules (targetSdk 36)**: `startForeground` must pass
   `FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE` (manifest type, Android 14); the
   service start is wrapped because Android 12+ can refuse background starts;
@@ -262,12 +268,12 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
   (the GitHub account is `swide-git`; the old ID is taken on Google Play by a managed
   Play private build, and Play never frees package names). `namespace` and the Kotlin
   package stay `io.github.swiderekartmax.seconddisplay`: the JNI function names in
-  `wormhole_jni.c` (`Java_io_github_swiderekartmax_seconddisplay_NativeBridge_*`) and the
+  `receiver_jni.c` (`Java_io_github_swiderekartmax_seconddisplay_NativeBridge_*`) and the
   `FindClass` string encode the Kotlin package, not the application ID; see "Package or
   class renames". Because the two differ, `am start` needs the full class name
   (`<applicationId>/io.github.swiderekartmax.seconddisplay.MainActivity`). The
   user-facing name *Second Display* lives in `app_name`, the dashboard title,
-  `WormholeIdentity.DEFAULT_SERVICE_NAME` and the service notification texts.
+  `ReceiverIdentity.DEFAULT_SERVICE_NAME` and the service notification texts.
 - **UI (Material You)**: `SecondDisplayTheme` uses the wallpaper colour scheme on
   Android 12+ and `Palette.LightScheme` / `DarkScheme` (orange) on Android 11, light
   or dark with the system. Composables take colours from `MaterialTheme.colorScheme`
@@ -287,14 +293,14 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
   does the 1024x500 Play feature graphic (`docs/images/play_feature_graphic.png`). The
   PNG mipmaps are only legacy fallbacks; the source design is
   `docs/images/second_display_icon.svg`.
-- **Package or class renames**: the JNI functions in `wormhole_jni.c`
+- **Package or class renames**: the JNI functions in `receiver_jni.c`
   (`Java_io_github_swiderekartmax_seconddisplay_NativeBridge_*`) and the
   `FindClass("io/github/swiderekartmax/seconddisplay/NativeBridge$Listener")` string encode
   the Kotlin package and class names. The build does not catch a mismatch; it
-  fails at runtime. The native library name `wormhole` must match
+  fails at runtime. The native library name `seconddisplay` must match
   `System.loadLibrary` in `NativeBridge.kt` and the CMake target in
   `app/build.gradle.kts`.
-- **UxPlay upgrades**: follow `docs/uxplay-patches.md` — re-vendor `lib/`,
+- **UxPlay upgrades**: follow `docs/uxplay-patches.md` - re-vendor `lib/`,
   re-apply each listed change, and keep the `dns_sd/` backend excluded.
 
 ## Rebuilding the native deps (only to upgrade OpenSSL/libplist)
@@ -306,7 +312,7 @@ adb logcat | grep -E "uxplay|Wormhole|AndroidRuntime|libc"
 
 Gotchas already encoded in the script: OpenSSL 3.0 wants `ANDROID_NDK_ROOT` (not
 `HOME`) and rejects `no-apps`; libplist 2.6.0's release tarball is autotools-only;
-its `make install` fails on ranlib PATH lookup *after* installing the archive —
+its `make install` fails on ranlib PATH lookup *after* installing the archive -
 the script runs `llvm-ranlib` manually. It also strips debug info from
 `libplist-2.0.a` so local build paths (`/Users/...`) never end up in the committed
 archive; check with `strings -a <archive> | grep /Users/` before committing

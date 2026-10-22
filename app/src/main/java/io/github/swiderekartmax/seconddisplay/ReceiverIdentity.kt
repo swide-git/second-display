@@ -8,7 +8,7 @@ import java.security.SecureRandom
  * Device identity for AirPlay plus the Wi-Fi multicast lock that the native
  * mDNS responder (UxPlay's embedded mdnsd) needs to receive Bonjour queries.
  */
-class WormholeIdentity(context: Context) {
+class ReceiverIdentity(context: Context) {
     private val prefs = context.getSharedPreferences("identity", Context.MODE_PRIVATE)
     private val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
     private var multicastLock: WifiManager.MulticastLock? = null
@@ -77,7 +77,7 @@ class WormholeIdentity(context: Context) {
     @Synchronized
     fun holdMulticastLock() {
         if (multicastLock == null) {
-            multicastLock = wifi.createMulticastLock("wormhole").apply {
+            multicastLock = wifi.createMulticastLock("seconddisplay").apply {
                 setReferenceCounted(true); acquire()
             }
         }
@@ -99,7 +99,7 @@ class WormholeIdentity(context: Context) {
     fun holdWifiLock() {
         if (wifiLock == null) {
             wifiLock = runCatching {
-                wifi.createWifiLock(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, "wormhole").apply {
+                wifi.createWifiLock(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, "seconddisplay").apply {
                     setReferenceCounted(false); acquire()
                 }
             }.getOrNull()

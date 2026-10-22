@@ -1,5 +1,5 @@
 /**
- *  Android port addition (Wormhole Display): legacy RAOP ("AirTunes") RSA support.
+ *  Android port addition (Second Display, originally Wormhole Display): legacy RAOP ("AirTunes") RSA support.
  *  See rsakey.h. The private key below is the widely published AirPort Express
  *  key that every third-party AirPlay 1 audio receiver (shairport, shairplay,
  *  forked-daapd, ...) uses; iTunes/Music refuse to stream audio without it.

@@ -5,8 +5,8 @@ plugins {
 }
 
 // CI sets these from scripts/version.sh; local builds use the dev defaults.
-val wormholeVersionName = providers.environmentVariable("SECOND_DISPLAY_VERSION_NAME").orElse("0.1.0-dev").get()
-val wormholeVersionCode = providers.environmentVariable("SECOND_DISPLAY_VERSION_CODE").orElse("1").get().toInt()
+val appVersionName = providers.environmentVariable("SECOND_DISPLAY_VERSION_NAME").orElse("0.1.0-dev").get()
+val appVersionCode = providers.environmentVariable("SECOND_DISPLAY_VERSION_CODE").orElse("1").get().toInt()
 // Release signing: CI decodes the keystore from repository secrets. Without it, release APKs are unsigned.
 val releaseKeystorePath = providers.environmentVariable("SECOND_DISPLAY_KEYSTORE_PATH").orNull?.takeIf { it.isNotEmpty() }
 
@@ -38,10 +38,10 @@ android {
         // Android 11+ phones and tablets. Portals (Android 9-10) are not supported by this build.
         minSdk = 30
         targetSdk = 36
-        versionCode = wormholeVersionCode
-        versionName = wormholeVersionName
+        versionCode = appVersionCode
+        versionName = appVersionName
         ndk { abiFilters += "arm64-v8a" }
-        externalNativeBuild { cmake { targets("wormhole") } }
+        externalNativeBuild { cmake { targets("seconddisplay") } }
     }
     buildTypes {
         release {

@@ -113,7 +113,9 @@ On the dashboard (when nothing is connected):
 | Orientation | tile under the status card | Landscape, portrait, or auto (devices with a rotation sensor) |
 | Speaker | Settings | Play sound through the device speakers |
 | Open when a stream starts | Settings | Needs *Display over other apps*; tap **Allow** to grant it |
-| Run in background / Start on boot | Settings | Keep the receiver discoverable |
+| Run in background | Settings | Keep the receiver discoverable after you leave the app. Off: the receiver stops as soon as the app leaves the screen |
+| Start on boot | Settings | Start the receiver after a reboot (needs *Run in background*) |
+| Quit (×) | top bar | Stop the receiver and close the app, whatever *Run in background* says |
 | H.265 video | Settings | Offer HEVC; the sender decides whether to use it. A Mac on Wi-Fi often stays on H.264 |
 | Stream stats | Settings | FPS, bitrate, resolution and codec in the top-left corner |
 | Name | This receiver | Name shown in Screen Mirroring (default: *Second Display*) |

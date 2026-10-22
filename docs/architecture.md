@@ -11,29 +11,29 @@ A port of the mirroring core of [UxPlay](https://github.com/FDH2/UxPlay) (C, `li
 vendored at `app/src/main/cpp/uxplay/`) to Android, replacing its GStreamer
 renderers with `MediaCodec` + `SurfaceView` for video and `AudioTrack` for audio:
 
-- **Protocol core** (`raop*.c`, `httpd.c`, `llhttp/`) — RTSP/HTTP control channel.
-- **Crypto** (`playfair/`, `pairing.c`, `srp.c`, `crypto.c`) — pairing handshake and
+- **Protocol core** (`raop*.c`, `httpd.c`, `llhttp/`) - RTSP/HTTP control channel.
+- **Crypto** (`playfair/`, `pairing.c`, `srp.c`, `crypto.c`) - pairing handshake and
   stream decryption; uses a static OpenSSL `libcrypto` for arm64.
-- **Discovery** — UxPlay's bundled internal mDNS responder (`lib/mdnsd/`) advertises
+- **Discovery** - UxPlay's bundled internal mDNS responder (`lib/mdnsd/`) advertises
   `_airplay._tcp` (port 7000) and `_raop._tcp` (port 7000). Android's `NsdManager` cannot publish TXT records before API 31 (this
   build supports API 30), and the `/info` handler asserts on the C `dnssd` object
   anyway, so advertisement stays native.
-- **JNI shim** (`cpp/wormhole_jni.c`) — server lifecycle and core callbacks.
+- **JNI shim** (`cpp/receiver_jni.c`) - server lifecycle and core callbacks.
   Decrypted Annex-B H.264/HEVC is copied to `VideoFrameQueue` → `VideoRenderer`
   (hardware `MediaCodec` on a `Surface`); decrypted AAC-ELD is copied to
   `AudioRenderer`.
-- **Now-playing callbacks** — the core hands over the metadata an audio sender
+- **Now-playing callbacks** - the core hands over the metadata an audio sender
   attaches with `SET_PARAMETER`: DMAP track info, cover art and `progress:` RTP
   timestamps. The shim parses DMAP (`cpp/dmap.c`) and forwards
   `NativeBridge.Listener.onNowPlaying`, `onCoverArt` and `onProgress`. They run on the
   audio RTP thread, only between `onAudioRunning(true)` and `onAudioRunning(false)`,
   and are default no-ops on the listener. Track text is decoded leniently through
   `String(bytes, "UTF-8")`, since senders' bytes need not be the modified UTF-8 that
-  `NewStringUTF` requires. `WormholeServer` keeps a `NowPlaying` state (position is
+  `NewStringUTF` requires. `ReceiverServer` keeps a `NowPlaying` state (position is
   extrapolated while audio flows and frozen on a flush) and decodes the art off the
   RTP thread; `MainActivity` shows it full screen for audio-only sessions.
-- **App layer** (Kotlin) — `WormholeService` (foreground service, multicast and
-  wake locks, boot autostart), `WormholeServer` (process-wide owner of the native
+- **App layer** (Kotlin) - `ReceiverService` (foreground service, multicast and
+  wake locks, boot autostart), `ReceiverServer` (process-wide owner of the native
   server, renderers and UI state), `MainActivity` (Compose dashboard and video
   surface), and `ScreenOrientation` (portrait/landscape/auto management with sensor
   handling).
@@ -55,10 +55,10 @@ flowchart LR
         subgraph Native["Native core (C)"]
             MDNS["mdnsd<br/>_airplay._tcp, _raop._tcp"]
             CORE["UxPlay core<br/>RTSP, FairPlay, decryption"]
-            SHIM["wormhole_jni.c and dmap.c<br/>JNI shim"]
+            SHIM["receiver_jni.c and dmap.c<br/>JNI shim"]
         end
         subgraph Kotlin["App layer (Kotlin)"]
-            SRV["WormholeServer<br/>session state and callbacks"]
+            SRV["ReceiverServer<br/>session state and callbacks"]
             VID["VideoFrameQueue and VideoRenderer<br/>MediaCodec to SurfaceView"]
             AUD["AudioRenderer<br/>AAC-ELD or PCM to AudioTrack"]
             NP["NowPlaying<br/>track, art, position"]
@@ -88,7 +88,7 @@ built so far, and `nativeStart` returns a negative code.
 
 ```mermaid
 flowchart TD
-    A["WormholeServer.startServer()<br/>multicast lock held"] --> B["nativeSetListener(listener)"]
+    A["ReceiverServer.startServer()<br/>multicast lock held"] --> B["nativeSetListener(listener)"]
     B --> C["nativeStart(keyFile, deviceId, name, width, height, fps, hevc)"]
     C --> D["raop_init2<br/>ed25519 key and device ID"]
     D --> E["raop_set_plist<br/>width, height, refreshRate, maxFPS"]
@@ -114,7 +114,7 @@ sequenceDiagram
     participant M as mdnsd
     participant C as UxPlay core
     participant J as JNI shim
-    participant K as WormholeServer
+    participant K as ReceiverServer
 
     S->>M: Browse _airplay._tcp and _raop._tcp
     M-->>S: Service name, pk and TXT records
@@ -146,7 +146,7 @@ sequenceDiagram
 
 ## Session states
 
-`WormholeServer` derives the UI state from these callbacks. Audio that arrives during a
+`ReceiverServer` derives the UI state from these callbacks. Audio that arrives during a
 mirroring session does not change the state, because mirroring already owns the screen.
 Back, Home, orientation changes and stream errors restart the native receiver, which
 resets the state to Idle.
@@ -214,7 +214,7 @@ Senders change the protocol periodically; the moving knobs are `model`, `srcvers
 and the `features` bitmask built by the vendored `dnssd` from `lib/dnssdint.h`
 (currently `AppleTV3,2` / `220.68` / `0x5A7FFEE6,0x0`, UxPlay's defaults; bit 42
 is added when experimental HEVC is enabled). Display geometry is advertised from
-real panel metrics via `raop_set_plist` in `wormhole_jni.c` — senders stream at
+real panel metrics via `raop_set_plist` in `receiver_jni.c` - senders stream at
 whatever size is advertised. When screen orientation changes (either via manual toggle
 or physical device rotation on devices with a rotation sensor),
 active mirroring clients are disconnected and the receiver restarts with transposed
@@ -233,7 +233,7 @@ next IDR, and `VideoRenderer` ends the session after 2 s without one.
 - While more than 3 frames are queued, `drainOutput` decodes every picture (the
   chain needs them) but releases output without rendering, except one frame per
   200 ms, so the picture jumps to the present instead of replaying the stall.
-- `WormholeIdentity` holds a `WIFI_MODE_FULL_LOW_LATENCY` lock while the receiver
+- `ReceiverIdentity` holds a `WIFI_MODE_FULL_LOW_LATENCY` lock while the receiver
   runs. Without it the radio dozes between packets and the sender sees round trips
   of up to a second, which is what produces the bursts. The mode only takes effect
   while the app is in the foreground with the screen on.
@@ -242,7 +242,7 @@ next IDR, and `VideoRenderer` ends the session after 2 s without one.
 
 `ResolutionPreset` picks the size advertised in `/info`: the native panel, a fixed
 common size (oriented like the panel, hidden if larger than it) or a percentage of
-the panel rounded down to a multiple of 8. `WormholeServer.setResolutionPreset`
+the panel rounded down to a multiple of 8. `ReceiverServer.setResolutionPreset`
 re-runs the same path as an orientation change: an active mirroring client is
 disconnected (the notice says "Resolution Changed") and the receiver restarts so
 the next connection reads the new geometry. The decoder output is scaled to the
