@@ -218,6 +218,9 @@ class MainActivity : ComponentActivity() {
                 updateOrientationMode(orientationSetting)
             }
             var floatingWindowEnabled by remember { mutableStateOf(ReceiverServer.floatingWindowEnabled) }
+            var requirePin by remember { mutableStateOf(ReceiverServer.requirePin) }
+            val pairingCode by ReceiverServer.pairingCode.collectAsState()
+            val pairedSenderCount by ReceiverServer.pairedSenderCount.collectAsState()
             // Keep the floating-window shape in step with the picture; auto-enter only while mirroring.
             LaunchedEffect(mirroring, videoAspectRatio, mirrorBounds, floatingWindowEnabled) {
                 if (pipSupported) setPictureInPictureParams(pictureInPictureParams())
@@ -390,6 +393,13 @@ class MainActivity : ComponentActivity() {
                                 debugOverlayEnabled = enabled
                                 ReceiverServer.setDebugOverlayEnabled(enabled)
                             },
+                            requirePin = requirePin,
+                            onRequirePinChanged = { enabled ->
+                                requirePin = enabled
+                                ReceiverServer.setRequirePin(enabled)
+                            },
+                            pairedSenderCount = pairedSenderCount,
+                            onForgetPairedSenders = { ReceiverServer.forgetPairedSenders() },
                             floatingWindowEnabled = floatingWindowEnabled,
                             onFloatingWindowEnabledChanged = { enabled ->
                                 floatingWindowEnabled = enabled
@@ -428,6 +438,7 @@ class MainActivity : ComponentActivity() {
                                 onDismiss = { ReceiverServer.dismissOrientationNotice() }
                             )
                         }
+                        pairingCode?.let { code -> PairingCodeDialog(code = code, clientName = client) }
                     }
                 }
             }
@@ -594,6 +605,32 @@ class MainActivity : ComponentActivity() {
         /** Started (visible) MainActivity instances; the service may bring a second one forward. */
         var startedActivities = 0
     }
+}
+
+/** The code a sender asks for while pairing; stays up until it pairs, starts streaming or gives up. */
+@Composable
+private fun PairingCodeDialog(code: String, clientName: String?) {
+    AlertDialog(
+        onDismissRequest = {},
+        icon = { Icon(Icons.Filled.Lock, contentDescription = null) },
+        title = { Text("AirPlay code") },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    "Enter this code on ${clientName ?: "your Mac, iPhone or iPad"}",
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    code.toCharArray().joinToString(" "),
+                    style = MaterialTheme.typography.displayLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        },
+        confirmButton = {}
+    )
 }
 
 /** D-pad / keyboard focus ring for clickable rows and tiles (TVs and tablets with keyboards). */
@@ -847,6 +884,10 @@ private fun DashboardScreen(
     hevcEnabled: Boolean,
     onHevcEnabledChanged: (Boolean) -> Unit,
     onDebugOverlayEnabledChanged: (Boolean) -> Unit,
+    requirePin: Boolean,
+    onRequirePinChanged: (Boolean) -> Unit,
+    pairedSenderCount: Int,
+    onForgetPairedSenders: () -> Unit,
     floatingWindowEnabled: Boolean,
     onFloatingWindowEnabledChanged: (Boolean) -> Unit,
     runInBackground: Boolean,
@@ -1026,6 +1067,24 @@ private fun DashboardScreen(
                 onClick = { showNameDialog = true },
                 trailing = { TextButton(onClick = { showNameDialog = true }) { Text("Rename") } }
             )
+            SwitchRow(
+                title = "Require a code",
+                supporting = if (requirePin) "A new Mac, iPhone or iPad enters a 4-digit code shown here, once"
+                             else "Anyone on this network can connect",
+                icon = Icons.Filled.Lock,
+                checked = requirePin,
+                onToggle = { onRequirePinChanged(!requirePin) }
+            )
+            if (requirePin && pairedSenderCount > 0) {
+                SettingRow(
+                    title = "Paired senders",
+                    supporting = if (pairedSenderCount == 1) "1 device connects without the code"
+                                 else "$pairedSenderCount devices connect without the code",
+                    icon = Icons.Filled.Delete,
+                    onClick = onForgetPairedSenders,
+                    trailing = { TextButton(onClick = onForgetPairedSenders) { Text("Forget") } }
+                )
+            }
             SettingRow(
                 title = "Restart receiver",
                 supporting = "Try this if it does not show up on your Mac or iPhone",

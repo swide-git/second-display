@@ -38,6 +38,12 @@ object NativeBridge {
 
         /** Unexpected mirror failure; the controller resets the server outside native callbacks. */
         fun onStreamError()
+
+        /** "Require a code": the sender now asks its user for this 4-digit [pin]. */
+        fun onDisplayPin(pin: String) {}
+
+        /** A sender paired with the code; store [publicKey] so it skips the code next time. */
+        fun onClientRegistered(publicKey: String, name: String) {}
     }
 
     /** Audio codec tags shared with receiver_jni.c (AirPlay "ct" values; 0 = decoded PCM). */
@@ -57,8 +63,12 @@ object NativeBridge {
         width: Int,
         height: Int,
         maxFps: Int,
-        allowHevc: Boolean
+        allowHevc: Boolean,
+        requirePin: Boolean
     ): Int
+
+    /** Senders paired with the code earlier (base64 ed25519 keys); call before [nativeStart]. */
+    external fun nativeSetTrustedSenders(keys: Array<String>)
 
     /** Hex ed25519 public key owned by the server; advertise it as pk=. */
     external fun nativePublicKey(): String?

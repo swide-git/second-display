@@ -371,11 +371,66 @@ static void cb_audio_running(void *cls, bool running) {
     (*env)->DeleteLocalRef(env, listener);
     if ((*env)->ExceptionCheck(env)) { (*env)->ExceptionDescribe(env); (*env)->ExceptionClear(env); }
 }
-static void cb_register_client(void *cls, const char *id, const char *pk, const char *name) {}
-static bool cb_check_register(void *cls, const char *pk) { return false; }
+/* "Require a code": senders that paired with the on-screen code (base64 ed25519 keys).
+ * Kotlin loads the stored list before start; a listed sender skips the code next time. */
+#define MAX_TRUSTED_SENDERS 64
+static pthread_mutex_t g_trusted_lock = PTHREAD_MUTEX_INITIALIZER;
+static char *g_trusted[MAX_TRUSTED_SENDERS];
+static int g_trusted_count;
+static jmethodID g_on_display_pin, g_on_client_registered;
+
+static void trusted_add_locked(const char *pk) {
+    for (int i = 0; i < g_trusted_count; i++) {
+        if (!strcmp(g_trusted[i], pk)) return;
+    }
+    if (g_trusted_count < MAX_TRUSTED_SENDERS) {
+        char *copy = strdup(pk);
+        if (copy) g_trusted[g_trusted_count++] = copy;
+    }
+}
+
+static void cb_register_client(void *cls, const char *id, const char *pk, const char *name) {
+    if (!pk) return;
+    pthread_mutex_lock(&g_trusted_lock);
+    trusted_add_locked(pk);
+    pthread_mutex_unlock(&g_trusted_lock);
+    LOGI("sender paired with the code: %s", name ? name : "?");
+    JNIEnv *env = env_for_thread();
+    if (!env) return;
+    jobject listener = listener_snapshot(env);
+    if (!listener) return;
+    jstring jpk = (*env)->NewStringUTF(env, pk);
+    jstring jname = utf8_jstring(env, name ? name : "");
+    (*env)->CallVoidMethod(env, listener, g_on_client_registered, jpk, jname);
+    if (jpk) (*env)->DeleteLocalRef(env, jpk);
+    if (jname) (*env)->DeleteLocalRef(env, jname);
+    (*env)->DeleteLocalRef(env, listener);
+    if ((*env)->ExceptionCheck(env)) { (*env)->ExceptionDescribe(env); (*env)->ExceptionClear(env); }
+}
+
+static bool cb_check_register(void *cls, const char *pk) {
+    bool found = false;
+    pthread_mutex_lock(&g_trusted_lock);
+    for (int i = 0; pk && i < g_trusted_count && !found; i++) {
+        found = !strcmp(g_trusted[i], pk);
+    }
+    pthread_mutex_unlock(&g_trusted_lock);
+    LOGI("pair-verify from a %s sender", found ? "paired" : "new");
+    return found;
+}
+
 static const char *cb_passwd(void *cls, int *len) { return NULL; }
 static void cb_export_dacp(void *cls, const char *a, const char *b) {}
-static void cb_display_pin(void *cls, char *pin) {}
+
+/* pair-pin-start: the sender now asks its user for the code shown on this device. */
+static void cb_display_pin(void *cls, char *pin) {
+    LOGI("showing the pairing code");
+    JNIEnv *env = env_for_thread();
+    if (!env || !pin) return;
+    jstring jpin = (*env)->NewStringUTF(env, pin);
+    call_void(g_on_display_pin, jpin);
+    if (jpin) (*env)->DeleteLocalRef(env, jpin);
+}
 static void cb_on_video_play(void *cls, const char *location, const float pos) {}
 static void cb_on_video_scrub(void *cls, const float pos) {}
 static void cb_on_video_rate(void *cls, const float rate) {}
@@ -403,6 +458,10 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
                                            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V");
     g_on_cover_art = (*env)->GetMethodID(env, cls, "onCoverArt", "([BZ)V");
     g_on_progress = (*env)->GetMethodID(env, cls, "onProgress", "(DD)V");
+    g_on_display_pin = (*env)->GetMethodID(env, cls, "onDisplayPin", "(Ljava/lang/String;)V");
+    g_on_client_registered = (*env)->GetMethodID(env, cls, "onClientRegistered",
+                                                 "(Ljava/lang/String;Ljava/lang/String;)V");
+    if (!(g_on_display_pin && g_on_client_registered)) return JNI_ERR;
     if (!(g_on_video_frame && g_on_audio_frame && g_on_audio_volume && g_on_audio_flush
           && g_on_client_connected && g_on_client_disconnected
           && g_on_mirror_running && g_on_audio_running && g_on_stream_error
@@ -429,7 +488,8 @@ JNIEXPORT void Java_io_github_swiderekartmax_seconddisplay_NativeBridge_nativeSe
 JNIEXPORT jint Java_io_github_swiderekartmax_seconddisplay_NativeBridge_nativeStart(JNIEnv *env, jclass cls,
                                                                jstring keyFile, jstring deviceId,
                                                                jstring serviceName,
-                                                               jint width, jint height, jint maxFps, jboolean allowHevc) {
+                                                               jint width, jint height, jint maxFps, jboolean allowHevc,
+                                                               jboolean requirePin) {
     pthread_mutex_lock(&g_lock);
     if (g_raop) {
         int port = raop_get_port(g_raop);
@@ -492,6 +552,8 @@ JNIEXPORT jint Java_io_github_swiderekartmax_seconddisplay_NativeBridge_nativeSt
     raop_set_plist(raop, "height", height);
     raop_set_plist(raop, "refreshRate", maxFps);
     raop_set_plist(raop, "maxFPS", maxFps);
+    /* 0 = a fresh random 4-digit code for every pairing, shown through display_pin. */
+    if (requirePin == JNI_TRUE) raop_set_plist(raop, "pin", 0);
 
     /* /info asserts on raop->dnssd and reads its TXT records, so the dnssd
      * object must exist and be attached BEFORE the HTTP listener can accept
@@ -505,7 +567,8 @@ JNIEXPORT jint Java_io_github_swiderekartmax_seconddisplay_NativeBridge_nativeSt
     }
     (*env)->ReleaseStringUTFChars(env, deviceId, hex);
     int dnssd_error = 0;
-    dnssd_t *dnssd = dnssd_init(name, (int) strlen(name), (const char *) hw, 6, 0, &dnssd_error);
+    dnssd_t *dnssd = dnssd_init(name, (int) strlen(name), (const char *) hw, 6,
+                                 requirePin == JNI_TRUE ? 1 : 0, &dnssd_error);  /* pw=true */
     (*env)->ReleaseStringUTFChars(env, serviceName, name);
     if (!dnssd || dnssd_error) {
         LOGE("dnssd init failed (%d); aborting startup", dnssd_error);
@@ -556,6 +619,25 @@ JNIEXPORT jint Java_io_github_swiderekartmax_seconddisplay_NativeBridge_nativeSt
     pthread_mutex_unlock(&g_lock);
     LOGI("Receiver listening on port %d (advertising %dx%d@%dHz, %s)", port, width, height, maxFps, width < height ? "portrait" : "landscape");
     return port;
+}
+
+JNIEXPORT void Java_io_github_swiderekartmax_seconddisplay_NativeBridge_nativeSetTrustedSenders(JNIEnv *env, jclass cls,
+                                                                                   jobjectArray keys) {
+    pthread_mutex_lock(&g_trusted_lock);
+    for (int i = 0; i < g_trusted_count; i++) free(g_trusted[i]);
+    g_trusted_count = 0;
+    jsize count = keys ? (*env)->GetArrayLength(env, keys) : 0;
+    for (jsize i = 0; i < count; i++) {
+        jstring key = (jstring) (*env)->GetObjectArrayElement(env, keys, i);
+        if (!key) continue;
+        const char *pk = (*env)->GetStringUTFChars(env, key, NULL);
+        if (pk) {
+            trusted_add_locked(pk);
+            (*env)->ReleaseStringUTFChars(env, key, pk);
+        }
+        (*env)->DeleteLocalRef(env, key);
+    }
+    pthread_mutex_unlock(&g_trusted_lock);
 }
 
 JNIEXPORT jstring Java_io_github_swiderekartmax_seconddisplay_NativeBridge_nativePublicKey(JNIEnv *env, jclass cls) {

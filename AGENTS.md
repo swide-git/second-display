@@ -308,6 +308,14 @@ adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
   carry `focusRing` so D-pad focus stays visible. Icons come from
   `material-icons-core` plus `AppIcons`; `material-icons-extended` is not needed
   (debug builds are not shrunk and it adds megabytes there).
+- **Require a code (AirPlay PIN)**: off by default (`require_pin`). On: `dnssd_init`
+  gets `pin_pw=1` (TXT `pw=true`, RAOP `sf=0x8c`) and `raop_set_plist(raop, "pin", 0)`
+  draws a random code per pairing. `cb_display_pin` → `onDisplayPin` shows it
+  (`PairingCodeDialog`, status text, notification; brings the app forward like a
+  stream). After pairing `cb_register_client` → `onClientRegistered` stores the sender's
+  base64 ed25519 key (`paired_senders`, "key<TAB>name"); `nativeSetTrustedSenders` loads
+  them before `nativeStart`, and `cb_check_register` lets them skip the code. Toggling
+  restarts the server because `pw=` is in the mDNS record.
 - **Problem reports**: `SecondDisplayApp` installs `ProblemReport`'s uncaught-exception
   recorder (`files/last-crash.txt`, then the default handler). *Report a problem* builds
   the report off the main thread: summary (version, device, Android, page size), the last
