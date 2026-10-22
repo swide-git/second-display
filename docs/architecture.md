@@ -148,8 +148,9 @@ sequenceDiagram
 
 `ReceiverServer` derives the UI state from these callbacks. Audio that arrives during a
 mirroring session does not change the state, because mirroring already owns the screen.
-Back, Home, orientation changes and stream errors restart the native receiver, which
-resets the state to Idle.
+Back, closing the floating window, orientation changes and stream errors restart the
+native receiver, which resets the state to Idle. Home during mirroring opens the
+picture-in-picture window instead; Home during audio-only playback disconnects.
 
 ```mermaid
 stateDiagram-v2
@@ -160,7 +161,7 @@ stateDiagram-v2
     AudioOnly --> Mirroring: onMirrorRunning(true)
     Mirroring --> Idle: onMirrorRunning(false)
     AudioOnly --> Idle: onAudioRunning(false)
-    Mirroring --> Idle: Back, Home, orientation change or stream error (restartServer)
+    Mirroring --> Idle: Back, closed floating window, orientation change or stream error (restartServer)
     AudioOnly --> Idle: Back or Home (restartServer)
     Idle --> [*]: stopServer()
 ```

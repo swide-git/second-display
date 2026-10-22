@@ -27,6 +27,7 @@ Second Display is an independent community project and is not affiliated with Ap
 - **Shows up natively on Mac, iPhone and iPad**, under a name you choose (`_airplay._tcp` and `_raop._tcp` on port 7000).
 - **Extended display or mirror**: a Mac can use the device as a second screen or mirror it.
 - **Preferred resolution**: offer the sender the native panel size, a common size (1920×1200, 1920×1080, 1680×1050, 1600×900, 1440×900, 1280×720) or 80 / 64 / 50 % of the panel. Lower sizes are lighter on Wi-Fi. Sizes larger than the panel are hidden; sizes with a different aspect are letterboxed, never stretched.
+- **Floating window**: go to the home screen while mirroring and the picture shrinks into a picture-in-picture window you can move around, like a video app. Tap it to go back full screen, swipe it away to disconnect.
 - **Pinch to zoom**: spread two fingers on the mirrored picture to zoom in up to 5×, drag to move around, double tap to go back. The zoom is local: the sender keeps sending the whole screen.
 - **Settings during a session**: long press on the mirrored picture. Stream stats and speaker output apply at once; resolution and HEVC end the session, because the sender only reads them when it connects.
 - **Survives Wi-Fi hiccups**: a low-latency Wi-Fi lock keeps the radio awake, and a 90-frame decoder buffer absorbs the burst a sender delivers after a stall, catching up without replaying it.
@@ -99,7 +100,7 @@ For crisp text, see the [text sharpness guide](docs/macos-text-sharpness.md).
 
 ### Ending a session
 
-Press **Back** or **Home** on the device, tap **Disconnect** in the in-session settings, or stop Screen Mirroring on the sender. Installing an update also ends a running session.
+Press **Back** on the device, close the floating window, tap **Disconnect** in the in-session settings, or stop Screen Mirroring on the sender. Installing an update also ends a running session.
 
 ---
 
@@ -215,7 +216,7 @@ Compared with [upstream Wormhole Display](https://github.com/pgodlews/wormhole-d
 - **Android 11+ launch crash fixed**: the display was read from the application context, which throws on API 30+.
 - **Targets current Android** (minSdk 30, targetSdk 36): notification permission (Android 13), foreground-service type (Android 14), edge-to-edge with hidden system bars (Android 15), orientation lock kept on tablets (Android 16). Portals (Android 9-10) are no longer supported.
 - **Stable on lossy Wi-Fi**: 90-frame decoder buffer (was 12) with catch-up that shows only the newest frame, and a low-latency Wi-Fi lock.
-- **Material You interface** (wallpaper colours, light and dark mode), **preferred resolution** setting, **pinch to zoom**, **version indicator** with GitHub release check, and **in-session settings** on long press.
+- **Material You interface** (wallpaper colours, light and dark mode), **preferred resolution** setting, **pinch to zoom**, **picture-in-picture** floating window, **version indicator** with GitHub release check, and **in-session settings** on long press.
 
 ---
 

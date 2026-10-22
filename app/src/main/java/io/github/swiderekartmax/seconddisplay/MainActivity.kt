@@ -3,15 +3,20 @@
 package io.github.swiderekartmax.seconddisplay
 
 import android.Manifest
+import android.app.AppOpsManager
+import android.app.PictureInPictureParams
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.Settings
+import android.util.Rational
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.View
@@ -19,6 +24,7 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.enableEdgeToEdge
+import androidx.lifecycle.Lifecycle
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
@@ -53,6 +59,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -159,6 +167,12 @@ class MainActivity : ComponentActivity() {
     private var networkDetails by mutableStateOf(NetworkInfoHelper.NetworkDetails("...", "...", false))
     // Android 10+ only lets the service bring this activity forward with "Display over other apps".
     private var canAutoOpen by mutableStateOf(true)
+
+    // Picture-in-picture: leaving the app while mirroring shrinks the stream into a floating window.
+    private var inPictureInPicture by mutableStateOf(false)
+    // Where the picture sits on screen, so the floating window animates out of it.
+    private var mirrorBounds by mutableStateOf<android.graphics.Rect?>(null)
+    private val pipSupported by lazy { packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE) }
  
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -202,6 +216,10 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(orientationSetting) {
                 updateOrientationMode(orientationSetting)
             }
+            // Keep the floating-window shape in step with the picture; auto-enter only while mirroring.
+            LaunchedEffect(mirroring, videoAspectRatio, mirrorBounds) {
+                if (pipSupported) setPictureInPictureParams(pictureInPictureParams())
+            }
 
             var audioEnabled by remember { mutableStateOf(ReceiverServer.audioEnabled) }
             var debugOverlayEnabled by remember { mutableStateOf(ReceiverServer.debugOverlayEnabled) }
@@ -214,10 +232,17 @@ class MainActivity : ComponentActivity() {
 
             SecondDisplayTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    if (mirroring) {
+                    if (inPictureInPicture && !mirroring) {
+                        // The sender left while the floating window was up.
+                        Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+                            Text("Stream ended", color = Palette.OverlayText, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    } else if (mirroring) {
                         BackHandler { ReceiverServer.disconnectClient("back") }
                         // Pinch zoom is local only; a new picture geometry starts unzoomed.
                         var zoom by remember(videoAspectRatio) { mutableStateOf(PinchZoom()) }
+                        // The floating window always shows the whole picture.
+                        val shownZoom = if (inPictureInPicture) PinchZoom() else zoom
                         var containerSize by remember { mutableStateOf(IntSize.Zero) }
                         Box(
                             Modifier
@@ -231,13 +256,13 @@ class MainActivity : ComponentActivity() {
                             // graphicsLayer: a SurfaceView's surface does not follow Compose layer transforms.
                             val surfaceModifier = Modifier.layout { measurable, constraints ->
                                 val (baseW, baseH) = PinchZoom.fit(videoAspectRatio, constraints.maxWidth, constraints.maxHeight)
-                                val w = (baseW * zoom.scale).toInt()
-                                val h = (baseH * zoom.scale).toInt()
+                                val w = (baseW * shownZoom.scale).toInt()
+                                val h = (baseH * shownZoom.scale).toInt()
                                 val placeable = measurable.measure(Constraints.fixed(w, h))
                                 layout(baseW, baseH) {
                                     placeable.place(
-                                        (baseW - w) / 2 + zoom.offsetX.toInt(),
-                                        (baseH - h) / 2 + zoom.offsetY.toInt()
+                                        (baseW - w) / 2 + shownZoom.offsetX.toInt(),
+                                        (baseH - h) / 2 + shownZoom.offsetY.toInt()
                                     )
                                 }
                             }
@@ -255,9 +280,16 @@ class MainActivity : ComponentActivity() {
                                         })
                                     }
                                 },
-                                modifier = surfaceModifier.background(Color.Black)
+                                modifier = surfaceModifier
+                                    .background(Color.Black)
+                                    .onGloballyPositioned { coordinates ->
+                                        if (!inPictureInPicture) {
+                                            val b = coordinates.boundsInWindow()
+                                            mirrorBounds = android.graphics.Rect(b.left.toInt(), b.top.toInt(), b.right.toInt(), b.bottom.toInt())
+                                        }
+                                    }
                             )
-                            if (debugOverlayEnabled) {
+                            if (debugOverlayEnabled && !inPictureInPicture) {
                                 TelemetryOverlay(
                                     telemetry = ReceiverServer.renderer.telemetry,
                                     modifier = Modifier
@@ -295,7 +327,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         DisposableEffect(Unit) { onDispose { showMirrorSettings = false } }
-                        if (showMirrorSettings) {
+                        if (showMirrorSettings && !inPictureInPicture) {
                             MirrorSettingsDialog(
                                 debugOverlayEnabled = debugOverlayEnabled,
                                 onDebugOverlayEnabledChanged = { enabled ->
@@ -429,6 +461,12 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         startedActivities--
+        // Left the mirror without the floating window (recents, another app, PiP turned off in
+        // settings). Screen off keeps the session, as before.
+        val screenOn = getSystemService(PowerManager::class.java)?.isInteractive != false
+        if (!isChangingConfigurations && !isInPictureInPictureMode && screenOn) {
+            ReceiverServer.disconnectClient("left the app")
+        }
         if (!isChangingConfigurations && startedActivities == 0 && !ReceiverServer.runInBackground) {
             stopReceiver()
         }
@@ -466,6 +504,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        // The floating window has its own shape; the advertised display must not follow it.
+        if (!isInPictureInPictureMode) reportDisplay(newConfig)
+    }
+
+    private fun reportDisplay(newConfig: Configuration) {
         val metrics = android.util.DisplayMetrics()
         @Suppress("DEPRECATION")
         windowManager.defaultDisplay.getRealMetrics(metrics)
@@ -489,10 +532,47 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun pictureInPictureParams(): PictureInPictureParams {
+        // Android accepts aspect ratios between 1:2.39 and 2.39:1.
+        val ratio = (ReceiverServer.videoAspectRatio.value ?: 16f / 9f).coerceIn(1f / 2.39f, 2.39f)
+        val builder = PictureInPictureParams.Builder().setAspectRatio(Rational((ratio * 1000).toInt(), 1000))
+        mirrorBounds?.takeIf { !it.isEmpty }?.let { builder.setSourceRectHint(it) }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            builder.setAutoEnterEnabled(ReceiverServer.isMirroring.value).setSeamlessResizeEnabled(false)
+        }
+        return builder.build()
+    }
+
+    /** False when the user switched picture-in-picture off for this app in system settings. */
+    private fun pictureInPictureAllowed(): Boolean {
+        if (!pipSupported) return false
+        val appOps = getSystemService(AppOpsManager::class.java) ?: return true
+        return appOps.unsafeCheckOpNoThrow(
+            AppOpsManager.OPSTR_PICTURE_IN_PICTURE, applicationInfo.uid, packageName
+        ) == AppOpsManager.MODE_ALLOWED
+    }
+
     // Home is a deliberate exit; not called when the service brings this activity forward.
+    // While mirroring it opens the floating window instead (Android 12+ enters it on its own).
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
+        if (ReceiverServer.isMirroring.value && pictureInPictureAllowed()) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) return
+            if (runCatching { enterPictureInPictureMode(pictureInPictureParams()) }.getOrDefault(false)) return
+        }
         ReceiverServer.disconnectClient("home")
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        inPictureInPicture = isInPictureInPictureMode
+        if (isInPictureInPictureMode) return
+        if (lifecycle.currentState == Lifecycle.State.CREATED) {
+            // The floating window was closed (swiped away or ×), not expanded.
+            ReceiverServer.disconnectClient("floating window closed")
+        } else {
+            reportDisplay(newConfig)
+        }
     }
 
     override fun onDestroy() {
