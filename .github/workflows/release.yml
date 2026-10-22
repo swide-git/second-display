@@ -136,6 +136,23 @@ jobs:
           (cd dist && sha256sum second-display.apk > second-display.apk.sha256)
           cat dist/*.sha256
 
+      - name: Check 16 KB page alignment
+        # Google Play withholds apps whose native libraries are not 16 KB aligned from
+        # devices with 16 KB memory pages (newer phones), which then report "can't download".
+        run: |
+          readelf="$ANDROID_HOME/ndk/$NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          zipalign="$(ls -d "$ANDROID_HOME"/build-tools/*/zipalign | sort -V | tail -1)"
+          work="$(mktemp -d)"
+          unzip -q dist/second-display.apk 'lib/*' -d "$work"
+          status=0
+          for so in "$work"/lib/*/*.so; do
+            align="$("$readelf" -lW "$so" | awk '/LOAD/ {print $NF}' | sort -u | tr '\n' ' ')"
+            echo "$(basename "$so"): $align"
+            case "$align" in *0x1000*|*0x2000*) status=1 ;; esac
+          done
+          "$zipalign" -c -P 16 4 dist/second-display.apk || status=1
+          exit $status
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
         with:

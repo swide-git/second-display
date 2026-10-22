@@ -41,7 +41,15 @@ android {
         versionCode = appVersionCode
         versionName = appVersionName
         ndk { abiFilters += "arm64-v8a" }
-        externalNativeBuild { cmake { targets("seconddisplay") } }
+        externalNativeBuild {
+            cmake {
+                targets("seconddisplay")
+                // 16 KB ELF segment alignment: Android 15+ devices with 16 KB memory pages
+                // cannot load 4 KB-aligned libraries, and Google Play withholds such apps from
+                // them ("can't download"). NDK r27 still defaults to 4 KB.
+                arguments += "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+            }
+        }
     }
     buildTypes {
         release {
