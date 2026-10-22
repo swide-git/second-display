@@ -830,6 +830,9 @@ private fun ScreenOrientation.description(autoSupported: Boolean): String = when
     ScreenOrientation.AUTO -> "Follows the tilt sensor"
 }
 
+/** Narrower than this the dashboard is not laid out (see the guard in DashboardScreen). */
+private val MIN_DASHBOARD_WIDTH = 280.dp
+
 @Composable
 private fun DashboardScreen(
     serviceName: String,
@@ -1098,73 +1101,82 @@ private fun DashboardScreen(
         }
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.surface,
-        // The window extends into the cutout (edge to edge); keep content clear of the camera.
-        contentWindowInsets = WindowInsets.displayCutout,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text("Second Display", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                },
-                actions = {
-                    val releasesUrl = "https://github.com/swide-git/second-display/releases/latest"
-                    val openReleases = {
-                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(releasesUrl))) }
-                        Unit
-                    }
-                    if (hasNewerRelease) {
-                        FilledTonalButton(onClick = openReleases) { Text("Update to v$latestReleaseVersion") }
-                    } else {
-                        TextButton(onClick = openReleases) { Text("v$appVersion") }
-                    }
-                    IconButton(onClick = onQuit, modifier = Modifier.focusRing(CircleShape)) {
-                        Icon(Icons.Filled.Close, contentDescription = "Quit Second Display")
-                    }
-                    Spacer(modifier = Modifier.width(4.dp))
-                },
-                windowInsets = WindowInsets.displayCutout,
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
-            )
+    // Launchers can lay the window out at a few dp wide while animating a relaunch.
+    // Material 3 ListItem then measures its text with negative constraints and throws
+    // (IllegalArgumentException in ListItemMeasurePolicy), which killed the app on reopen.
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        if (maxWidth < MIN_DASHBOARD_WIDTH) {
+            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface))
+            return@BoxWithConstraints
         }
-    ) { padding ->
-        val contentPadding = Modifier
-            .padding(padding)
-            .padding(horizontal = if (wide) 24.dp else 16.dp)
-        if (wide) {
-            Row(
-                modifier = contentPadding.fillMaxSize(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.surface,
+            // The window extends into the cutout (edge to edge); keep content clear of the camera.
+            contentWindowInsets = WindowInsets.displayCutout,
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text("Second Display", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    },
+                    actions = {
+                        val releasesUrl = "https://github.com/swide-git/second-display/releases/latest"
+                        val openReleases = {
+                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(releasesUrl))) }
+                            Unit
+                        }
+                        if (hasNewerRelease) {
+                            FilledTonalButton(onClick = openReleases) { Text("Update to v$latestReleaseVersion") }
+                        } else {
+                            TextButton(onClick = openReleases) { Text("v$appVersion") }
+                        }
+                        IconButton(onClick = onQuit, modifier = Modifier.focusRing(CircleShape)) {
+                            Icon(Icons.Filled.Close, contentDescription = "Quit Second Display")
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                    },
+                    windowInsets = WindowInsets.displayCutout,
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+                )
+            }
+        ) { padding ->
+            val contentPadding = Modifier
+                .padding(padding)
+                .padding(horizontal = if (wide) 24.dp else 16.dp)
+            if (wide) {
+                Row(
+                    modifier = contentPadding.fillMaxSize(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        statusCard()
+                        pickers()
+                        connectionsCard(Modifier)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        settingsCard()
+                        deviceCard()
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+            } else {
                 Column(
-                    modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                    modifier = contentPadding.fillMaxSize().verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     statusCard()
                     pickers()
-                    connectionsCard(Modifier)
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-                Column(
-                    modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
                     settingsCard()
+                    connectionsCard(Modifier)
                     deviceCard()
                     Spacer(modifier = Modifier.height(8.dp))
                 }
-            }
-        } else {
-            Column(
-                modifier = contentPadding.fillMaxSize().verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                statusCard()
-                pickers()
-                settingsCard()
-                connectionsCard(Modifier)
-                deviceCard()
-                Spacer(modifier = Modifier.height(8.dp))
             }
         }
     }
