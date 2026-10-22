@@ -1,55 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Second Display: a laptop with a tablet as its second screen. Drawn on the 108 dp adaptive
-     canvas, scaled to 66 % around the centre so the tablet corner stays in the safe zone. -->
+<!-- Second Display: a monitor with a tablet in front of it as its second screen, in the
+     Material You tonal palette (Palette.kt). Drawn on the 108 dp adaptive canvas and scaled
+     to 92 % around the centre so the corners stay inside the 72 dp visible area. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <group
-        android:pivotX="53"
-        android:pivotY="50.5"
-        android:scaleX="0.66"
-        android:scaleY="0.66"
-        android:translateX="1"
-        android:translateY="3.5">
-        <!-- Main screen (laptop) -->
-        <path
-            android:pathData="M25,30 h38 a3,3 0 0 1 3,3 v24 a3,3 0 0 1 -3,3 h-38 a3,3 0 0 1 -3,-3 v-24 a3,3 0 0 1 3,-3 z"
-            android:strokeColor="#FF9F43"
-            android:strokeWidth="3.5" />
-        <path
-            android:pathData="M17,66 H71"
-            android:strokeColor="#FF9F43"
-            android:strokeLineCap="round"
-            android:strokeWidth="3.5" />
-        <!-- Wireless link -->
-        <path
-            android:pathData="M60,22 a10,10 0 0 1 10,10"
-            android:strokeAlpha="0.6"
-            android:strokeColor="#FF9F43"
-            android:strokeLineCap="round"
-            android:strokeWidth="3" />
-        <path
-            android:pathData="M60,15 a17,17 0 0 1 17,17"
-            android:strokeAlpha="0.35"
-            android:strokeColor="#FF9F43"
-            android:strokeLineCap="round"
-            android:strokeWidth="3" />
-        <!-- Second display (tablet), in front -->
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.92"
+        android:scaleY="0.92">
+        <!-- Monitor, cut around the tablet so a background-coloured gap separates them -->
         <path
             android:fillColor="#FF9F43"
-            android:pathData="M60,42 h24 a5,5 0 0 1 5,5 v34 a5,5 0 0 1 -5,5 h-24 a5,5 0 0 1 -5,-5 v-34 a5,5 0 0 1 5,-5 z" />
+            android:pathData="M32,30 H68 A5,5 0 0 1 73,35 V39 H60 A8,8 0 0 0 52,47 V60 H32 A5,5 0 0 1 27,55 V35 A5,5 0 0 1 32,30 Z" />
         <path
-            android:fillColor="#3A2A18"
-            android:pathData="M61.5,47 h21 a2,2 0 0 1 2,2 v30 a2,2 0 0 1 -2,2 h-21 a2,2 0 0 1 -2,-2 v-30 a2,2 0 0 1 2,-2 z" />
-        <path
-            android:fillAlpha="0.8"
             android:fillColor="#FF9F43"
-            android:pathData="M64.5,51 h15 a1.5,1.5 0 0 1 0,3 h-15 a1.5,1.5 0 0 1 0,-3 z" />
+            android:pathData="M38,60 h8 v6 h-8 z M34.5,66 h15 a1.5,1.5 0 0 1 0,3 h-15 a1.5,1.5 0 0 1 0,-3 z" />
+        <!-- Tablet with two lines of mirrored content -->
         <path
-            android:fillAlpha="0.5"
-            android:fillColor="#FF9F43"
-            android:pathData="M64.5,57 h9 a1.5,1.5 0 0 1 0,3 h-9 a1.5,1.5 0 0 1 0,-3 z" />
+            android:fillColor="#904D00"
+            android:pathData="M60,42 h16 a5,5 0 0 1 5,5 v26 a5,5 0 0 1 -5,5 h-16 a5,5 0 0 1 -5,-5 v-26 a5,5 0 0 1 5,-5 z" />
+        <path
+            android:fillColor="#FFDCC2"
+            android:pathData="M60.5,49 h15 a1.5,1.5 0 0 1 0,3 h-15 a1.5,1.5 0 0 1 0,-3 z M60.5,55 h9 a1.5,1.5 0 0 1 0,3 h-9 a1.5,1.5 0 0 1 0,-3 z" />
     </group>
 </vector>

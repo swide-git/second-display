@@ -1,15 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 108 108">
   <!-- Same geometry as res/drawable/ic_launcher_foreground.xml (108 dp adaptive canvas). -->
-  <rect width="108" height="108" rx="24" fill="#121214"/>
-  <!-- Main screen (laptop) -->
-  <rect x="22" y="30" width="44" height="30" rx="3" fill="none" stroke="#FF9F43" stroke-width="3.5"/>
-  <path d="M17 66 H71" stroke="#FF9F43" stroke-width="3.5" stroke-linecap="round"/>
-  <!-- Wireless link -->
-  <path d="M60 22 a10 10 0 0 1 10 10" fill="none" stroke="#FF9F43" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
-  <path d="M60 15 a17 17 0 0 1 17 17" fill="none" stroke="#FF9F43" stroke-width="3" stroke-linecap="round" opacity="0.35"/>
-  <!-- Second display (tablet), in front -->
-  <rect x="55" y="42" width="34" height="44" rx="5" fill="#FF9F43"/>
-  <rect x="59.5" y="47" width="25" height="34" rx="2" fill="#3A2A18"/>
-  <rect x="63" y="51" width="18" height="3" rx="1.5" fill="#FF9F43" opacity="0.8"/>
-  <rect x="63" y="57" width="12" height="3" rx="1.5" fill="#FF9F43" opacity="0.5"/>
+  <rect width="108" height="108" rx="24" fill="#FFDCC2"/>
+  <g transform="translate(54 54) scale(0.92) translate(-54 -54)">
+    <!-- Monitor, cut around the tablet -->
+    <path fill="#FF9F43" d="M32,30 H68 A5,5 0 0 1 73,35 V39 H60 A8,8 0 0 0 52,47 V60 H32 A5,5 0 0 1 27,55 V35 A5,5 0 0 1 32,30 Z"/>
+    <path fill="#FF9F43" d="M38,60 h8 v6 h-8 z M34.5,66 h15 a1.5,1.5 0 0 1 0,3 h-15 a1.5,1.5 0 0 1 0,-3 z"/>
+    <!-- Tablet with two lines of mirrored content -->
+    <rect x="55" y="42" width="26" height="36" rx="5" fill="#904D00"/>
+    <rect x="59" y="49" width="18" height="3" rx="1.5" fill="#FFDCC2"/>
+    <rect x="59" y="55" width="12" height="3" rx="1.5" fill="#FFDCC2"/>
+  </g>
 </svg>
