@@ -216,8 +216,9 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(orientationSetting) {
                 updateOrientationMode(orientationSetting)
             }
+            var floatingWindowEnabled by remember { mutableStateOf(ReceiverServer.floatingWindowEnabled) }
             // Keep the floating-window shape in step with the picture; auto-enter only while mirroring.
-            LaunchedEffect(mirroring, videoAspectRatio, mirrorBounds) {
+            LaunchedEffect(mirroring, videoAspectRatio, mirrorBounds, floatingWindowEnabled) {
                 if (pipSupported) setPictureInPictureParams(pictureInPictureParams())
             }
 
@@ -388,6 +389,11 @@ class MainActivity : ComponentActivity() {
                                 debugOverlayEnabled = enabled
                                 ReceiverServer.setDebugOverlayEnabled(enabled)
                             },
+                            floatingWindowEnabled = floatingWindowEnabled,
+                            onFloatingWindowEnabledChanged = { enabled ->
+                                floatingWindowEnabled = enabled
+                                ReceiverServer.setFloatingWindowEnabled(enabled)
+                            },
                             runInBackground = runInBackground,
                             onRunInBackgroundChanged = { enabled ->
                                 runInBackground = enabled
@@ -538,14 +544,15 @@ class MainActivity : ComponentActivity() {
         val builder = PictureInPictureParams.Builder().setAspectRatio(Rational((ratio * 1000).toInt(), 1000))
         mirrorBounds?.takeIf { !it.isEmpty }?.let { builder.setSourceRectHint(it) }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            builder.setAutoEnterEnabled(ReceiverServer.isMirroring.value).setSeamlessResizeEnabled(false)
+            builder.setAutoEnterEnabled(ReceiverServer.isMirroring.value && ReceiverServer.floatingWindowEnabled)
+                .setSeamlessResizeEnabled(false)
         }
         return builder.build()
     }
 
     /** False when the user switched picture-in-picture off for this app in system settings. */
     private fun pictureInPictureAllowed(): Boolean {
-        if (!pipSupported) return false
+        if (!pipSupported || !ReceiverServer.floatingWindowEnabled) return false
         val appOps = getSystemService(AppOpsManager::class.java) ?: return true
         return appOps.unsafeCheckOpNoThrow(
             AppOpsManager.OPSTR_PICTURE_IN_PICTURE, applicationInfo.uid, packageName
@@ -836,6 +843,8 @@ private fun DashboardScreen(
     hevcEnabled: Boolean,
     onHevcEnabledChanged: (Boolean) -> Unit,
     onDebugOverlayEnabledChanged: (Boolean) -> Unit,
+    floatingWindowEnabled: Boolean,
+    onFloatingWindowEnabledChanged: (Boolean) -> Unit,
     runInBackground: Boolean,
     onRunInBackgroundChanged: (Boolean) -> Unit,
     startOnBoot: Boolean,
@@ -960,6 +969,14 @@ private fun DashboardScreen(
                         FilledTonalButton(onClick = onRequestAutoOpen) { Text("Allow") }
                     }
                 }
+            )
+            SwitchRow(
+                title = "Floating window",
+                supporting = if (floatingWindowEnabled) "Home while mirroring keeps the picture in a small window"
+                             else "Home while mirroring disconnects",
+                icon = AppIcons.PictureInPicture,
+                checked = floatingWindowEnabled,
+                onToggle = { onFloatingWindowEnabledChanged(!floatingWindowEnabled) }
             )
             SwitchRow(
                 title = "Run in background",

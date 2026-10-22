@@ -256,7 +256,8 @@ adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
   the window shape. Closing the window (`onPictureInPictureModeChanged` with the
   lifecycle at CREATED) disconnects the sender; so does leaving the app any other way
   with the screen on (`onStop`). The user can turn PiP off per app in system settings
-  (checked through AppOps); Home then disconnects as before. The manifest needs
+  (checked through AppOps) and in the app's *Floating window* setting
+  (`floating_window_enabled`, default on); Home then disconnects as before. The manifest needs
   `supportsPictureInPicture` and `smallestScreenSize|screenLayout` in `configChanges`,
   or entering the window recreates the activity.
 - **Receiver lifetime**: `MainActivity.onStart` starts `ReceiverService`; `onStop`
