@@ -129,6 +129,7 @@ On the dashboard (when nothing is connected):
 | Resolution | tile under the status card | Size offered to the sender; tap to open the list |
 | Orientation | tile under the status card | Landscape, portrait, or auto (devices with a rotation sensor) |
 | Speaker | Settings | Play sound through the device speakers |
+| Picture delay | Settings (with Speaker on) | 0-500 ms: delays the picture so it matches Bluetooth headphones or speakers, which play sound late. Suggested when Bluetooth output is active |
 | Open when a stream starts | Settings | Needs *Display over other apps*; tap **Allow** to grant it |
 | Floating window | Settings | Home while mirroring keeps the picture in a picture-in-picture window; off: Home disconnects |
 | Run in background | Settings | Keep the receiver discoverable after you leave the app. Off: the receiver stops as soon as the app leaves the screen |

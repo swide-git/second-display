@@ -142,6 +142,9 @@ internal class VideoFrameQueue(
 
     @Synchronized fun peek(): Frame? = frames.peekFirst()
     @Synchronized fun depth(): Int = frames.size
+    /** Frames already due for decoding: queued at least [delayNanos] ago (all of them without a delay). */
+    @Synchronized fun dueDepth(now: Long, delayNanos: Long): Int =
+        if (delayNanos <= 0L) frames.size else frames.count { now - it.receivedNanos >= delayNanos }
     @Synchronized fun consumed(frame: Frame) {
         if (frames.peekFirst() === frame) {
             frames.removeFirst()

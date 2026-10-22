@@ -118,6 +118,10 @@ object ReceiverServer {
     private val hevcFailedThisProcess = AtomicBoolean(false)
     var runInBackground: Boolean = true
         private set
+    /** Picture delay in ms (0..500): lines the picture up with Bluetooth audio, which lags. */
+    var pictureDelayMs: Int = 0
+        private set
+
     /** New senders must enter a 4-digit code shown on this device (AirPlay PIN pairing). */
     var requirePin: Boolean = false
         private set
@@ -197,6 +201,8 @@ object ReceiverServer {
         runInBackground = prefs.getBoolean("run_in_background", true)
         floatingWindowEnabled = prefs.getBoolean("floating_window_enabled", true)
         requirePin = prefs.getBoolean("require_pin", false)
+        pictureDelayMs = prefs.getInt("picture_delay_ms", 0).coerceIn(0, MAX_PICTURE_DELAY_MS)
+        renderer.pictureDelayNanos = pictureDelayMs * 1_000_000L
         _pairedSenderCount.value = pairedSenders().size
         startOnBoot = prefs.getBoolean("start_on_boot", true)
         _resolutionPreset.value = ResolutionPreset.fromId(prefs.getString("resolution_preset", null))
@@ -231,6 +237,27 @@ object ReceiverServer {
         debugOverlayEnabled = enabled
         prefs.edit().putBoolean("debug_overlay_enabled", enabled).apply()
     }
+
+    fun setPictureDelayMs(ms: Int) {
+        pictureDelayMs = ms.coerceIn(0, MAX_PICTURE_DELAY_MS)
+        renderer.pictureDelayNanos = pictureDelayMs * 1_000_000L
+        prefs.edit().putInt("picture_delay_ms", pictureDelayMs).apply()
+    }
+
+    const val MAX_PICTURE_DELAY_MS = 500
+
+    /** True when sound goes to Bluetooth headphones or a speaker, which add 100-300 ms. */
+    fun isBluetoothAudioOutput(context: Context): Boolean = runCatching {
+        val audio = context.getSystemService(android.media.AudioManager::class.java)
+        val bluetooth = buildSet {
+            add(android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                add(android.media.AudioDeviceInfo.TYPE_BLE_HEADSET)
+                add(android.media.AudioDeviceInfo.TYPE_BLE_SPEAKER)
+            }
+        }
+        audio.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS).any { it.type in bluetooth }
+    }.getOrDefault(false)
 
     fun setRequirePin(enabled: Boolean) {
         if (requirePin == enabled) return

@@ -24,6 +24,20 @@ class DecoderPumpTest {
         override fun close() { closed = true }
     }
 
+    @Test fun `picture delay holds a frame until it is due`() {
+        var now = 1_000L
+        val delayed = DecoderPump(queue, delayNanos = { 200L }, clock = { now })
+        val codec = FakeDecoder()
+        queue.offer(first, 1_000L)
+        assertFalse(delayed.tick { codec })
+        assertTrue(codec.submitted.isEmpty())
+        now = 1_199L
+        assertFalse(delayed.tick { codec })
+        now = 1_200L
+        assertTrue(delayed.tick { codec })
+        assertEquals(1, codec.submitted.size)
+    }
+
     @Test fun `late decoded output is released without another network frame`() {
         val codec = FakeDecoder()
         queue.offer(first, 0); pump.tick { codec }

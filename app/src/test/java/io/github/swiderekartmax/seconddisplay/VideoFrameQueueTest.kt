@@ -7,6 +7,16 @@ class VideoFrameQueueTest {
     private fun nal(type: Int) = byteArrayOf(0, 0, 0, 1, type.toByte(), 0x55)
     private val config get() = nal(7) + nal(8)
 
+    @Test fun `due depth counts only frames past the picture delay`() {
+        val queue = VideoFrameQueue()
+        queue.offer(nal(7) + nal(8) + nal(5), 0)
+        queue.offer(nal(1), 100)
+        queue.offer(nal(1), 200)
+        assertEquals(3, queue.dueDepth(now = 200, delayNanos = 0))
+        assertEquals(2, queue.dueDepth(now = 200, delayNanos = 100))
+        assertEquals(0, queue.dueDepth(now = 200, delayNanos = 1_000))
+    }
+
     @Test fun `separate SPS and PPS survive until the IDR`() {
         val q = VideoFrameQueue()
         q.offer(nal(7), 0); q.offer(nal(8), 1); q.offer(nal(1), 2)

@@ -76,6 +76,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -226,6 +227,7 @@ class MainActivity : ComponentActivity() {
             }
             var floatingWindowEnabled by remember { mutableStateOf(ReceiverServer.floatingWindowEnabled) }
             var requirePin by remember { mutableStateOf(ReceiverServer.requirePin) }
+            var pictureDelayMs by remember { mutableIntStateOf(ReceiverServer.pictureDelayMs) }
             val pairingCode by ReceiverServer.pairingCode.collectAsState()
             val pairedSenderCount by ReceiverServer.pairedSenderCount.collectAsState()
             // Keep the floating-window shape in step with the picture; auto-enter only while mirroring.
@@ -399,6 +401,11 @@ class MainActivity : ComponentActivity() {
                             onDebugOverlayEnabledChanged = { enabled ->
                                 debugOverlayEnabled = enabled
                                 ReceiverServer.setDebugOverlayEnabled(enabled)
+                            },
+                            pictureDelayMs = pictureDelayMs,
+                            onPictureDelayChanged = { ms ->
+                                pictureDelayMs = ms
+                                ReceiverServer.setPictureDelayMs(ms)
                             },
                             requirePin = requirePin,
                             onRequirePinChanged = { enabled ->
@@ -902,6 +909,8 @@ private fun DashboardScreen(
     hevcEnabled: Boolean,
     onHevcEnabledChanged: (Boolean) -> Unit,
     onDebugOverlayEnabledChanged: (Boolean) -> Unit,
+    pictureDelayMs: Int,
+    onPictureDelayChanged: (Int) -> Unit,
     requirePin: Boolean,
     onRequirePinChanged: (Boolean) -> Unit,
     pairedSenderCount: Int,
@@ -924,6 +933,7 @@ private fun DashboardScreen(
 ) {
     var showNameDialog by remember { mutableStateOf(false) }
     var showReportDialog by remember { mutableStateOf(false) }
+    var showDelayDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val configuration = LocalConfiguration.current
     val context = LocalContext.current
@@ -1021,6 +1031,20 @@ private fun DashboardScreen(
                 checked = audioEnabled,
                 onToggle = { onAudioEnabledChanged(!audioEnabled) }
             )
+            if (audioEnabled) {
+                val bluetooth = remember(showDelayDialog) { ReceiverServer.isBluetoothAudioOutput(context) }
+                SettingRow(
+                    title = "Picture delay",
+                    supporting = when {
+                        pictureDelayMs > 0 -> "$pictureDelayMs ms, to match the sound"
+                        bluetooth -> "Bluetooth audio lags the picture: delay the picture to match"
+                        else -> "Off. For Bluetooth headphones or speakers"
+                    },
+                    icon = AppIcons.Timer,
+                    onClick = { showDelayDialog = true },
+                    trailing = { TextButton(onClick = { showDelayDialog = true }) { Text("Adjust") } }
+                )
+            }
             SettingRow(
                 title = "Open when a stream starts",
                 supporting = if (canAutoOpen) "The receiver comes to the front on its own"
@@ -1269,6 +1293,35 @@ private fun DashboardScreen(
                 }
             }
         }
+    }
+
+    if (showDelayDialog) {
+        var draft by remember { mutableFloatStateOf(pictureDelayMs.toFloat()) }
+        AlertDialog(
+            onDismissRequest = { showDelayDialog = false },
+            icon = { Icon(AppIcons.Timer, contentDescription = null) },
+            title = { Text("Picture delay") },
+            text = {
+                Column {
+                    Text(
+                        "Bluetooth headphones and speakers play sound 100-300 ms late. Delaying the " +
+                            "picture by the same amount brings them back in sync. It also delays " +
+                            "the mouse on an extended display, so keep it at 0 with the built-in speaker."
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Text("${draft.toInt()} ms", style = MaterialTheme.typography.titleLarge)
+                    Slider(
+                        value = draft,
+                        onValueChange = { draft = (it / 10f).roundToInt() * 10f },
+                        valueRange = 0f..ReceiverServer.MAX_PICTURE_DELAY_MS.toFloat(),
+                        // Applied on release, so a stream can be checked while adjusting.
+                        onValueChangeFinished = { onPictureDelayChanged(draft.toInt()) }
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { onPictureDelayChanged(draft.toInt()); showDelayDialog = false }) { Text("Done") } },
+            dismissButton = { TextButton(onClick = { draft = 0f; onPictureDelayChanged(0) }) { Text("Reset") } }
+        )
     }
 
     if (showReportDialog) {

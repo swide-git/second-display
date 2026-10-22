@@ -311,6 +311,14 @@ adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
   carry `focusRing` so D-pad focus stays visible. Icons come from
   `material-icons-core` plus `AppIcons`; `material-icons-extended` is not needed
   (debug builds are not shrunk and it adds megabytes there).
+- **Picture delay (A/V sync)**: mirroring plays audio and video as they arrive, so a
+  Bluetooth output (100-300 ms) leaves sound behind the picture. The fix delays the
+  picture, not the sound: `DecoderPump` submits a frame only `pictureDelayNanos` after
+  it was queued, and the catch-up rule counts `VideoFrameQueue.dueDepth` (frames past the
+  delay) instead of `depth`, so held frames are not mistaken for a backlog. 0-500 ms,
+  `picture_delay_ms`; the 90-frame queue covers 500 ms at 60 fps. The dashboard suggests
+  it when an A2DP or LE audio output is present. RAOP's `Audio-Latency` header only
+  matters for buffered audio-only streams.
 - **Require a code (AirPlay PIN)**: off by default (`require_pin`). On: `dnssd_init`
   gets `pin_pw=1` (TXT `pw=true`, RAOP `sf=0x8c`) and `raop_set_plist(raop, "pin", 0)`
   draws a random code per pairing. `cb_display_pin` → `onDisplayPin` shows it

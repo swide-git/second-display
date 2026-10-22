@@ -1,7 +1,12 @@
 package io.github.swiderekartmax.seconddisplay
 
 /** Called only by the renderer worker; kept independent of Android for timing regression tests. */
-internal class DecoderPump(private val input: VideoFrameQueue) {
+internal class DecoderPump(
+    private val input: VideoFrameQueue,
+    /** Picture delay (A/V sync with a late audio output); a frame waits this long in the queue. */
+    private val delayNanos: () -> Long = { 0L },
+    private val clock: () -> Long = System::nanoTime
+) {
     interface Decoder {
         fun drain(render: Boolean)
         /** false means input pressure: caller keeps the access unit and retries. */
@@ -18,6 +23,8 @@ internal class DecoderPump(private val input: VideoFrameQueue) {
         decoder?.drain(input.currentGeneration() == current)
         val frame = input.peek() ?: return false
         if (frame.generation != current) return false
+        val delay = delayNanos()
+        if (delay > 0L && clock() - frame.receivedNanos < delay) return false
         val target = decoder ?: create()?.also { decoder = it } ?: return false
         if (input.currentGeneration() != current) { close(); return false }
         if (!target.submit(frame)) return false
