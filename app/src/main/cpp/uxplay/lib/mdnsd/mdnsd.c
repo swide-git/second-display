@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #ifndef WIN32
 #include <ifaddrs.h>
@@ -31,6 +32,8 @@
 #define MDNS_MAX_PACKET 1500
 #define MDNS_COMBINED_PACKET_MAX 1200
 #define MDNS_TTL_HOST 120
+#define MDNS_MAX_IFACES4 8
+#define MDNS_IFACE_RESCAN_SECONDS 3
 
 #define DNS_TYPE_A 1
 #define DNS_TYPE_AAAA 28
@@ -54,12 +57,26 @@ typedef enum {
     MDNS_FAMILY_IPV6
 } mdns_family_t;
 
+/*
+ * Android port: every local IPv4 network the device is on (Wi-Fi, its own
+ * hotspot, USB or Ethernet tethering) is a separate mDNS link. A phone with
+ * mobile data routes multicast to the cellular interface, so a single
+ * "default" interface left the hotspot silent.
+ */
+typedef struct {
+    uint32_t addr;
+    unsigned int index;
+} mdns_iface4_t;
+
 struct mdnsd_s {
     char host_name[MDNSD_MAX_NAME];
     mdnsd_service_t airplay;
     mdnsd_service_t raop;
 
-    uint32_t ipv4_addr;
+    uint32_t ipv4_addr;          /* A record for the link being answered */
+    mdns_iface4_t ifaces4[MDNS_MAX_IFACES4];
+    int iface4_count;
+    time_t ifaces4_scanned;
     unsigned char ipv6_addr[16];
     unsigned int ipv6_scope_id;
     int sock_fd4;
@@ -496,6 +513,10 @@ static int mdns_open_socket4(uint32_t iface_addr)
 #endif
     setsockopt(fd, IPPROTO_IP, IP_MULTICAST_TTL, (const char *) &ttl, sizeof(ttl));
     setsockopt(fd, IPPROTO_IP, IP_MULTICAST_LOOP, (const char *) &loop, sizeof(loop));
+#ifdef IP_PKTINFO
+    /* Tells which interface a query came in on (mdns_thread). */
+    setsockopt(fd, IPPROTO_IP, IP_PKTINFO, (const char *) &one, sizeof(one));
+#endif
 
     if (iface_addr) {
         struct in_addr iface;
@@ -583,6 +604,141 @@ static int mdns_open_socket6(unsigned int scope_id)
     }
 
     return fd;
+}
+
+#ifndef _WIN32
+static int mdns_iface4_wanted(const struct ifaddrs *ifa)
+{
+    /* Cellular, VPN and translation interfaces are not local links. */
+    static const char *skip[] = {
+        "rmnet", "r_rmnet", "ccmni", "clat", "v4-", "tun", "ipsec", "dummy", "seth", "pdp"
+    };
+    const struct sockaddr_in *sin;
+
+    if (!ifa->ifa_addr || ifa->ifa_addr->sa_family != AF_INET ||
+        !(ifa->ifa_flags & IFF_UP) || !(ifa->ifa_flags & IFF_MULTICAST) ||
+        (ifa->ifa_flags & (IFF_LOOPBACK | IFF_POINTOPOINT))) {
+        return 0;
+    }
+    sin = (const struct sockaddr_in *) ifa->ifa_addr;
+    if (!sin->sin_addr.s_addr) {
+        return 0;
+    }
+    for (size_t i = 0; i < sizeof(skip) / sizeof(skip[0]); i++) {
+        if (!strncmp(ifa->ifa_name, skip[i], strlen(skip[i]))) {
+            return 0;
+        }
+    }
+    return 1;
+}
+#endif
+
+static void mdns_use_iface4_locked(mdnsd_t *mdnsd, const mdns_iface4_t *iface)
+{
+    struct in_addr addr;
+
+    mdnsd->ipv4_addr = iface->addr;
+    addr.s_addr = iface->addr;
+    if (mdnsd->sock_fd4 != -1) {
+        setsockopt(mdnsd->sock_fd4, IPPROTO_IP, IP_MULTICAST_IF, (const char *) &addr, sizeof(addr));
+    }
+}
+
+static const mdns_iface4_t *mdns_find_iface4(const mdnsd_t *mdnsd, unsigned int index)
+{
+    for (int i = 0; i < mdnsd->iface4_count; i++) {
+        if (mdnsd->ifaces4[i].index == index) {
+            return &mdnsd->ifaces4[i];
+        }
+    }
+    return NULL;
+}
+
+static void mdns_announce_locked(mdnsd_t *mdnsd, uint32_t ttl);
+static void mdns_send_response_locked(mdnsd_t *mdnsd, int include_airplay,
+                                      int include_raop, int include_host, uint32_t ttl,
+                                      mdns_family_t family, const void *to);
+
+/*
+ * Joins the mDNS group on every local IPv4 link and leaves the ones that went
+ * away. Links that appear while running (hotspot switched on) get an
+ * announcement when announce_new is set.
+ */
+static void mdns_scan_ifaces4_locked(mdnsd_t *mdnsd, int announce_new)
+{
+#ifndef _WIN32
+    struct ifaddrs *ifaddr = NULL;
+    mdns_iface4_t found[MDNS_MAX_IFACES4];
+    int count = 0;
+
+    mdnsd->ifaces4_scanned = time(NULL);
+    if (getifaddrs(&ifaddr) == -1) {
+        return;
+    }
+    for (struct ifaddrs *ifa = ifaddr; ifa && count < MDNS_MAX_IFACES4; ifa = ifa->ifa_next) {
+        unsigned int index;
+        int duplicate = 0;
+
+        if (!mdns_iface4_wanted(ifa)) {
+            continue;
+        }
+        index = if_nametoindex(ifa->ifa_name);
+        for (int i = 0; i < count; i++) {
+            duplicate |= found[i].index == index;
+        }
+        if (!index || duplicate) {
+            continue;
+        }
+        found[count].addr = ((const struct sockaddr_in *) ifa->ifa_addr)->sin_addr.s_addr;
+        found[count].index = index;
+        count++;
+    }
+    freeifaddrs(ifaddr);
+
+    if (mdnsd->sock_fd4 != -1) {
+        struct ip_mreq mreq;
+
+        memset(&mreq, 0, sizeof(mreq));
+        inet_pton(AF_INET, MDNS_ADDR4, &mreq.imr_multiaddr);
+        for (int i = 0; i < mdnsd->iface4_count; i++) {
+            int kept = 0;
+            for (int j = 0; j < count; j++) {
+                kept |= found[j].index == mdnsd->ifaces4[i].index &&
+                        found[j].addr == mdnsd->ifaces4[i].addr;
+            }
+            if (!kept) {
+                mreq.imr_interface.s_addr = mdnsd->ifaces4[i].addr;
+                setsockopt(mdnsd->sock_fd4, IPPROTO_IP, IP_DROP_MEMBERSHIP,
+                           (const char *) &mreq, sizeof(mreq));
+            }
+        }
+        for (int j = 0; j < count; j++) {
+            int known = 0;
+            for (int i = 0; i < mdnsd->iface4_count; i++) {
+                known |= found[j].index == mdnsd->ifaces4[i].index &&
+                         found[j].addr == mdnsd->ifaces4[i].addr;
+            }
+            if (known) {
+                continue;
+            }
+            /* EADDRINUSE when the default join already covers this link: fine. */
+            mreq.imr_interface.s_addr = found[j].addr;
+            setsockopt(mdnsd->sock_fd4, IPPROTO_IP, IP_ADD_MEMBERSHIP,
+                       (const char *) &mreq, sizeof(mreq));
+            if (announce_new) {
+                mdns_use_iface4_locked(mdnsd, &found[j]);
+                mdns_send_response_locked(mdnsd, 1, 1, 1, MDNSD_TTL_SERVICE,
+                                          MDNS_FAMILY_IPV4, NULL);
+            }
+        }
+    }
+
+    memcpy(mdnsd->ifaces4, found, sizeof(found[0]) * (size_t) count);
+    mdnsd->iface4_count = count;
+#else
+    (void) mdnsd;
+    (void) announce_new;
+#endif
 }
 
 static int mdns_begin_response(mdns_packet_t *packet, size_t *count_pos)
@@ -804,7 +960,14 @@ static void mdns_send_response_locked(mdnsd_t *mdnsd, int include_airplay,
 
 static void mdns_announce_locked(mdnsd_t *mdnsd, uint32_t ttl)
 {
-    mdns_send_response_locked(mdnsd, 1, 1, 1, ttl, MDNS_FAMILY_IPV4, NULL);
+    if (mdnsd->iface4_count) {
+        for (int i = 0; i < mdnsd->iface4_count; i++) {
+            mdns_use_iface4_locked(mdnsd, &mdnsd->ifaces4[i]);
+            mdns_send_response_locked(mdnsd, 1, 1, 1, ttl, MDNS_FAMILY_IPV4, NULL);
+        }
+    } else {
+        mdns_send_response_locked(mdnsd, 1, 1, 1, ttl, MDNS_FAMILY_IPV4, NULL);
+    }
     mdns_send_response_locked(mdnsd, 1, 1, 1, ttl, MDNS_FAMILY_IPV6, NULL);
 }
 
@@ -857,7 +1020,7 @@ static int mdns_question_matches_service(const mdnsd_t *mdnsd, const char *name,
 
 static void mdns_handle_query(mdnsd_t *mdnsd, const unsigned char *bytes,
                               size_t length, mdns_family_t family,
-                              const void *from, int from_port)
+                              const void *from, int from_port, unsigned int ifindex)
 {
     uint16_t flags;
     uint16_t qdcount;
@@ -899,6 +1062,18 @@ static void mdns_handle_query(mdnsd_t *mdnsd, const unsigned char *bytes,
                                       &include_raop, &include_host);
     }
 
+    if ((include_airplay || include_raop || include_host) &&
+        family == MDNS_FAMILY_IPV4 && mdnsd->iface4_count) {
+        /* Answer on the link the query came from, with that link's address. */
+        const mdns_iface4_t *iface = ifindex ? mdns_find_iface4(mdnsd, ifindex) : NULL;
+        if (!iface && ifindex) {
+            /* A link we do not serve (cellular); a new one shows up on the next scan. */
+            include_airplay = include_raop = include_host = 0;
+        } else {
+            mdns_use_iface4_locked(mdnsd, iface ? iface : &mdnsd->ifaces4[0]);
+        }
+    }
+
     if (include_airplay || include_raop || include_host) {
         mdns_send_response_locked(mdnsd, include_airplay, include_raop,
                                   include_host, MDNSD_TTL_SERVICE, family, NULL);
@@ -927,6 +1102,9 @@ static THREAD_RETVAL mdns_thread(void *arg)
         fd4 = mdnsd->sock_fd4;
         fd6 = mdnsd->sock_fd6;
         running = mdnsd->running;
+        if (running && time(NULL) - mdnsd->ifaces4_scanned >= MDNS_IFACE_RESCAN_SECONDS) {
+            mdns_scan_ifaces4_locked(mdnsd, 1);
+        }
         MUTEX_UNLOCK(mdnsd->mutex);
 
         if (!running || (fd4 == -1 && fd6 == -1)) {
@@ -951,12 +1129,37 @@ static THREAD_RETVAL mdns_thread(void *arg)
         if (ret > 0 && fd4 != -1 && FD_ISSET(fd4, &rfds)) {
             unsigned char buffer[MDNS_MAX_PACKET];
             struct sockaddr_in from;
+            unsigned int ifindex = 0;
+            int received;
+#if !defined(_WIN32) && defined(IP_PKTINFO)
+            char control[CMSG_SPACE(sizeof(struct in_pktinfo))];
+            struct iovec iov;
+            struct msghdr msg;
+
+            iov.iov_base = buffer;
+            iov.iov_len = sizeof(buffer);
+            memset(&msg, 0, sizeof(msg));
+            msg.msg_name = &from;
+            msg.msg_namelen = sizeof(from);
+            msg.msg_iov = &iov;
+            msg.msg_iovlen = 1;
+            msg.msg_control = control;
+            msg.msg_controllen = sizeof(control);
+            received = (int) recvmsg(fd4, &msg, 0);
+            for (struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg); received > 0 && cmsg;
+                 cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+                if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_PKTINFO) {
+                    ifindex = (unsigned int) ((struct in_pktinfo *) CMSG_DATA(cmsg))->ipi_ifindex;
+                }
+            }
+#else
             socklen_t from_len = sizeof(from);
-            int received = (int) recvfrom(fd4, (char *) buffer, sizeof(buffer), 0,
-                                          (struct sockaddr *) &from, &from_len);
+            received = (int) recvfrom(fd4, (char *) buffer, sizeof(buffer), 0,
+                                      (struct sockaddr *) &from, &from_len);
+#endif
             if (received > 0) {
                 mdns_handle_query(mdnsd, buffer, (size_t) received,
-                                  MDNS_FAMILY_IPV4, &from, from.sin_port);
+                                  MDNS_FAMILY_IPV4, &from, from.sin_port, ifindex);
             }
         }
         if (ret > 0 && fd6 != -1 && FD_ISSET(fd6, &rfds)) {
@@ -967,7 +1170,7 @@ static THREAD_RETVAL mdns_thread(void *arg)
                                           (struct sockaddr *) &from, &from_len);
             if (received > 0) {
                 mdns_handle_query(mdnsd, buffer, (size_t) received,
-                                  MDNS_FAMILY_IPV6, &from, from.sin6_port);
+                                  MDNS_FAMILY_IPV6, &from, from.sin6_port, 0);
             }
         }
     }
@@ -1051,6 +1254,9 @@ int mdnsd_start(mdnsd_t *mdnsd)
         MUTEX_UNLOCK(mdnsd->mutex);
         return error4 ? error4 : error6;
     }
+
+    mdnsd->iface4_count = 0;
+    mdns_scan_ifaces4_locked(mdnsd, 0);
 
     mdnsd->running = 1;
     THREAD_CREATE(mdnsd->thread, mdns_thread, mdnsd);
@@ -1144,7 +1350,13 @@ void mdnsd_goodbye(mdnsd_t *mdnsd, const mdnsd_service_t *service)
     }
 
     MUTEX_LOCK(mdnsd->mutex);
-    mdns_send_service_locked(mdnsd, service, 0, 0, MDNS_FAMILY_IPV4, NULL);
+    for (int i = 0; i < mdnsd->iface4_count; i++) {
+        mdns_use_iface4_locked(mdnsd, &mdnsd->ifaces4[i]);
+        mdns_send_service_locked(mdnsd, service, 0, 0, MDNS_FAMILY_IPV4, NULL);
+    }
+    if (!mdnsd->iface4_count) {
+        mdns_send_service_locked(mdnsd, service, 0, 0, MDNS_FAMILY_IPV4, NULL);
+    }
     mdns_send_service_locked(mdnsd, service, 0, 0, MDNS_FAMILY_IPV6, NULL);
     MUTEX_UNLOCK(mdnsd->mutex);
 }

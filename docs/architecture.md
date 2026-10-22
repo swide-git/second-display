@@ -15,7 +15,9 @@ renderers with `MediaCodec` + `SurfaceView` for video and `AudioTrack` for audio
 - **Crypto** (`playfair/`, `pairing.c`, `srp.c`, `crypto.c`) - pairing handshake and
   stream decryption; uses a static OpenSSL `libcrypto` for arm64.
 - **Discovery** - UxPlay's bundled internal mDNS responder (`lib/mdnsd/`) advertises
-  `_airplay._tcp` (port 7000) and `_raop._tcp` (port 7000). Android's `NsdManager` cannot publish TXT records before API 31 (this
+  `_airplay._tcp` (port 7000) and `_raop._tcp` (port 7000) on every local IPv4 link
+  (Wi-Fi, the device's own hotspot, USB or Ethernet tethering; not cellular or VPN), so
+  a sender on the device's hotspot finds it too. Android's `NsdManager` cannot publish TXT records before API 31 (this
   build supports API 30), and the `/info` handler asserts on the C `dnssd` object
   anyway, so advertisement stays native.
 - **JNI shim** (`cpp/receiver_jni.c`) - server lifecycle and core callbacks.
