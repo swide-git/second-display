@@ -293,6 +293,8 @@ adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
   does the 1024x500 Play feature graphic (`docs/images/play_feature_graphic.png`). The
   PNG mipmaps are only legacy fallbacks; the source design is
   `docs/images/second_display_icon.svg`.
+  The notification uses `ic_notification.xml`, the same glyph cropped to 24 dp and
+  white (status bar icons use only alpha), tinted `#904D00` with `setColor`.
 - **Package or class renames**: the JNI functions in `receiver_jni.c`
   (`Java_io_github_swiderekartmax_seconddisplay_NativeBridge_*`) and the
   `FindClass("io/github/swiderekartmax/seconddisplay/NativeBridge$Listener")` string encode

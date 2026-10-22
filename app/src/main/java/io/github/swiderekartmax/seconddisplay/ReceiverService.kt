@@ -213,7 +213,8 @@ class ReceiverService : Service() {
 
         builder.setContentTitle("Second Display Receiver")
             .setContentText(contentText)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setColor(0xFF904D00.toInt())
             .setContentIntent(pendingIntent)
             .setOngoing(true)
 
