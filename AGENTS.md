@@ -244,6 +244,17 @@ adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
   surface is a separate layer and does not follow Compose layer transforms. The
   codec keeps its own buffer size, so a large view does not allocate large buffers.
   Zoom resets when the picture aspect changes and is never sent to the sender.
+- **Picture-in-picture**: Home while mirroring shrinks the stream into a floating
+  window (`setAutoEnterEnabled` on Android 12+, `enterPictureInPictureMode` in
+  `onUserLeaveHint` on Android 11). Params follow the video aspect ratio and the
+  surface bounds (`setSourceRectHint`). In the window: no zoom, stats or dialogs, and
+  `onConfigurationChanged` is not forwarded, so the advertised display never follows
+  the window shape. Closing the window (`onPictureInPictureModeChanged` with the
+  lifecycle at CREATED) disconnects the sender; so does leaving the app any other way
+  with the screen on (`onStop`). The user can turn PiP off per app in system settings
+  (checked through AppOps); Home then disconnects as before. The manifest needs
+  `supportsPictureInPicture` and `smallestScreenSize|screenLayout` in `configChanges`,
+  or entering the window recreates the activity.
 - **Receiver lifetime**: `MainActivity.onStart` starts `ReceiverService`; `onStop`
   (not `onDestroy`, which may come hours later) stops the service and the server when
   "Run in background" is off and no other `MainActivity` is visible. The service is
