@@ -114,6 +114,7 @@ On the dashboard (when nothing is connected):
 | Orientation | tile under the status card | Landscape, portrait, or auto (devices with a rotation sensor) |
 | Speaker | Settings | Play sound through the device speakers |
 | Open when a stream starts | Settings | Needs *Display over other apps*; tap **Allow** to grant it |
+| Floating window | Settings | Home while mirroring keeps the picture in a picture-in-picture window; off: Home disconnects |
 | Run in background | Settings | Keep the receiver discoverable after you leave the app. Off: the receiver stops as soon as the app leaves the screen |
 | Start on boot | Settings | Start the receiver after a reboot (needs *Run in background*) |
 | Quit (×) | top bar | Stop the receiver and close the app, whatever *Run in background* says |

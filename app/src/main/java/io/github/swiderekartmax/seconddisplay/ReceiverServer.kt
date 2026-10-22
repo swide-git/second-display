@@ -118,6 +118,9 @@ object ReceiverServer {
     private val hevcFailedThisProcess = AtomicBoolean(false)
     var runInBackground: Boolean = true
         private set
+    /** Home while mirroring shrinks the stream into a picture-in-picture window. */
+    var floatingWindowEnabled: Boolean = true
+        private set
     var startOnBoot: Boolean = true
         private set
 
@@ -181,6 +184,7 @@ object ReceiverServer {
         debugOverlayEnabled = prefs.getBoolean("debug_overlay_enabled", false)
         hevcEnabled = prefs.getBoolean("hevc_enabled", false)
         runInBackground = prefs.getBoolean("run_in_background", true)
+        floatingWindowEnabled = prefs.getBoolean("floating_window_enabled", true)
         startOnBoot = prefs.getBoolean("start_on_boot", true)
         _resolutionPreset.value = ResolutionPreset.fromId(prefs.getString("resolution_preset", null))
 
@@ -213,6 +217,11 @@ object ReceiverServer {
     fun setDebugOverlayEnabled(enabled: Boolean) {
         debugOverlayEnabled = enabled
         prefs.edit().putBoolean("debug_overlay_enabled", enabled).apply()
+    }
+
+    fun setFloatingWindowEnabled(enabled: Boolean) {
+        floatingWindowEnabled = enabled
+        prefs.edit().putBoolean("floating_window_enabled", enabled).apply()
     }
 
     fun setHevcEnabled(enabled: Boolean) {
