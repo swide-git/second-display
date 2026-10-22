@@ -77,6 +77,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 data class DisplayInfo(
     val width: Int,
@@ -863,8 +864,11 @@ private fun DashboardScreen(
     onQuit: () -> Unit
 ) {
     var showNameDialog by remember { mutableStateOf(false) }
+    var showReportDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val configuration = LocalConfiguration.current
     val context = LocalContext.current
+    var lastRunCrashed by remember { mutableStateOf(ProblemReport.hasLastCrash(context)) }
     val appVersion = remember(context) {
         runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.1.0-dev"
@@ -1029,6 +1033,15 @@ private fun DashboardScreen(
                 onClick = onRestartServer,
                 trailing = { TextButton(onClick = onRestartServer) { Text("Restart") } }
             )
+            SettingRow(
+                title = "Report a problem",
+                supporting = if (lastRunCrashed) "The app stopped unexpectedly last time. Send the details"
+                             else "Diagnostics for a GitHub issue",
+                icon = Icons.Filled.Warning,
+                onClick = { showReportDialog = true },
+                titleColor = if (lastRunCrashed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                trailing = { TextButton(onClick = { showReportDialog = true }) { Text("Report") } }
+            )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
             InfoRow("Display", "${displayInfo.width} × ${displayInfo.height} @ ${displayInfo.refreshRate} Hz (${displayInfo.aspectRatioLabel})")
             InfoRow("AirPlay port", "7000")
@@ -1179,6 +1192,53 @@ private fun DashboardScreen(
                 }
             }
         }
+    }
+
+    if (showReportDialog) {
+        // Builds the report off the main thread, then copies it and opens GitHub or the share sheet.
+        fun deliver(share: Boolean) {
+            showReportDialog = false
+            scope.launch {
+                val report = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    ProblemReport.build(context)
+                }
+                val crashed = lastRunCrashed
+                if (share) {
+                    val send = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_SUBJECT, "Second Display problem report")
+                        putExtra(Intent.EXTRA_TEXT, report)
+                    }
+                    runCatching { context.startActivity(Intent.createChooser(send, "Share the report")) }
+                } else {
+                    context.getSystemService(android.content.ClipboardManager::class.java)
+                        ?.setPrimaryClip(android.content.ClipData.newPlainText("Second Display report", report))
+                    android.widget.Toast.makeText(context, "Diagnostics copied. Paste them into the issue", android.widget.Toast.LENGTH_LONG).show()
+                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, ProblemReport.issueUri(context, crashed))) }
+                }
+                ProblemReport.clearLastCrash(context)
+                lastRunCrashed = false
+            }
+        }
+        AlertDialog(
+            onDismissRequest = { showReportDialog = false },
+            icon = { Icon(Icons.Filled.Warning, contentDescription = null) },
+            title = { Text("Report a problem") },
+            text = {
+                Text(
+                    "The report holds the app version, device model, Android version, the last crash and " +
+                        "this app's recent log, which includes the receiver name, sender names and network " +
+                        "addresses. Nothing is sent automatically: you choose where it goes."
+                )
+            },
+            confirmButton = { TextButton(onClick = { deliver(share = false) }) { Text("GitHub issue") } },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { showReportDialog = false }) { Text("Cancel") }
+                    TextButton(onClick = { deliver(share = true) }) { Text("Share…") }
+                }
+            }
+        )
     }
 
     if (showNameDialog) {

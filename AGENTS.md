@@ -308,6 +308,12 @@ adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
   carry `focusRing` so D-pad focus stays visible. Icons come from
   `material-icons-core` plus `AppIcons`; `material-icons-extended` is not needed
   (debug builds are not shrunk and it adds megabytes there).
+- **Problem reports**: `SecondDisplayApp` installs `ProblemReport`'s uncaught-exception
+  recorder (`files/last-crash.txt`, then the default handler). *Report a problem* builds
+  the report off the main thread: summary (version, device, Android, page size), the last
+  crash and `logcat -d` (an app reads only its own entries), copies it and opens a
+  prefilled GitHub issue, or shares it. Nothing is sent automatically; keep it that way,
+  the privacy policy says no data is collected.
 - **R8**: release builds are minified and resource-shrunk (about 6.7 MB instead of
   28 MB); the App Bundle carries the mapping file for Play. `app/proguard-rules.pro`
   keeps `NativeBridge` (JNI function names) and `NativeBridge$Listener` with every

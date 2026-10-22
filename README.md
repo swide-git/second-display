@@ -122,6 +122,7 @@ On the dashboard (when nothing is connected):
 | Stream stats | Settings | FPS, bitrate, resolution and codec in the top-left corner |
 | Name | This receiver | Name shown in Screen Mirroring (default: *Second Display*) |
 | Restart receiver | This receiver | Re-announces the receiver on the network |
+| Report a problem | This receiver | Builds a report (version, device, last crash, the app's recent log) and copies it for a GitHub issue or shares it. Nothing is sent automatically |
 
 The version in the top bar opens the releases page; it turns into **Update to vX.Y.Z** when a newer release exists.
 
@@ -203,7 +204,7 @@ See [the architecture notes](docs/architecture.md) for details.
 
 ## Privacy and security
 
-- Apart from the device that connects to it on the local network, the app makes one request: the dashboard asks `api.github.com` for the latest release number to show next to the installed version. No analytics, crash reporting, ads or other external servers. Its only libraries are Jetpack Compose (UI), OpenSSL and libplist (AirPlay protocol).
+- Apart from the device that connects to it on the local network, the app makes one request: the dashboard asks `api.github.com` for the latest release number to show next to the installed version. No analytics, automatic crash reporting, ads or other external servers. *Report a problem* only builds a report on the device; you decide whether to paste or share it. Its only libraries are Jetpack Compose (UI), OpenSSL and libplist (AirPlay protocol).
 - It accepts screen-mirroring connections from **any device on your local network, without a PIN or password**. Use it only on networks you trust.
 
 ---
