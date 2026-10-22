@@ -8,7 +8,7 @@ import androidx.compose.ui.unit.dp
 
 /**
  * The few Material icons that `material-icons-core` lacks. Kept as path data instead of pulling in
- * `material-icons-extended`, which adds megabytes of dex to a build without R8.
+ * `material-icons-extended`, which adds megabytes of dex to unshrunk debug builds.
  */
 object AppIcons {
     val Cast by lazy {

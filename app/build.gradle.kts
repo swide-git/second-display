@@ -54,6 +54,11 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.findByName("release")
+            // R8: smaller app, and Play gets the mapping file from the bundle. JNI names are
+            // kept in proguard-rules.pro; renaming them breaks the native callbacks at runtime.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
     externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt") } }

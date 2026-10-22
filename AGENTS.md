@@ -271,6 +271,8 @@ adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
   defaults to 4 KB. Without it Google Play withholds the app from devices with 16 KB
   memory pages, which report "can't download" (a Galaxy S26 Ultra did). CI checks
   `llvm-readelf -lW` and `zipalign -c -P 16` on every build.
+- **Dependencies**: Compose BOM 2026.06.01 and activity-compose 1.13.0 are the newest
+  that build with AGP 8.9 and compileSdk 36; later BOMs need AGP 9.1 and compileSdk 37.
 - **Platform rules (targetSdk 36)**: `startForeground` must pass
   `FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE` (manifest type, Android 14); the
   service start is wrapped because Android 12+ can refuse background starts;
@@ -304,8 +306,14 @@ adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
   *Recent connections* and *This receiver*; two columns when the window is at least
   600 dp wide in landscape (or 840 dp in any orientation). Clickable rows and tiles
   carry `focusRing` so D-pad focus stays visible. Icons come from
-  `material-icons-core` plus `AppIcons`; do not add `material-icons-extended`
-  (megabytes of dex without R8).
+  `material-icons-core` plus `AppIcons`; `material-icons-extended` is not needed
+  (debug builds are not shrunk and it adds megabytes there).
+- **R8**: release builds are minified and resource-shrunk (about 6.7 MB instead of
+  28 MB); the App Bundle carries the mapping file for Play. `app/proguard-rules.pro`
+  keeps `NativeBridge` (JNI function names) and `NativeBridge$Listener` with every
+  implementation (`receiver_jni.c` calls its methods by name). A new JNI callback or
+  `external fun` needs no new rule as long as it lives in those two types; anything
+  else the native side looks up by name does. Check with `dexdump` on the release APK.
 - **Launcher icon**: adaptive icon in `mipmap-anydpi-v26/ic_launcher.xml` (vector
   monitor and tablet in the Material You tones of `Palette.kt`: `#FFDCC2` background,
   `#FF9F43` monitor, `#904D00` tablet; scaled to 92 % so the corners stay in the 72 dp
