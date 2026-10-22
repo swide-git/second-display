@@ -53,7 +53,7 @@ jobs:
         run: |
           sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           yes | "$sdkmanager" --licenses > /dev/null || true
-          "$sdkmanager" --install "platforms;android-36" "ndk;$NDK_VERSION" "cmake;3.22.1" > /dev/null
+          "$sdkmanager" --install "platforms;android-37.0" "ndk;$NDK_VERSION" "cmake;3.22.1" > /dev/null
 
       - name: Compute version
         run: |
@@ -135,6 +135,10 @@ jobs:
           fi
           (cd dist && sha256sum second-display.apk > second-display.apk.sha256)
           cat dist/*.sha256
+
+      - name: Check JNI names survive R8
+        # receiver_jni.c finds Kotlin methods by name; a renamed one only fails at runtime.
+        run: scripts/check-jni-names.sh dist/second-display.apk
 
       - name: Check 16 KB page alignment
         # Google Play withholds apps whose native libraries are not 16 KB aligned from

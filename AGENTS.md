@@ -271,8 +271,11 @@ adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
   defaults to 4 KB. Without it Google Play withholds the app from devices with 16 KB
   memory pages, which report "can't download" (a Galaxy S26 Ultra did). CI checks
   `llvm-readelf -lW` and `zipalign -c -P 16` on every build.
-- **Dependencies**: Compose BOM 2026.06.01 and activity-compose 1.13.0 are the newest
-  that build with AGP 8.9 and compileSdk 36; later BOMs need AGP 9.1 and compileSdk 37.
+- **Build toolchain**: AGP 9.4.1 with built-in Kotlin (no `org.jetbrains.kotlin.android`
+  in the app module; the root only pins the Kotlin Gradle plugin, 2.4.21), Gradle 9.8.2,
+  compileSdk 37 (`platforms;android-37.0`), targetSdk 36, Compose BOM 2026.09.00.
+  `kotlinOptions` is gone in AGP 9: JVM target is set in `kotlin { compilerOptions }`.
+  SDK 37 annotates more platform types as nullable, e.g. `videoCapabilities`.
 - **Platform rules (targetSdk 36)**: `startForeground` must pass
   `FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE` (manifest type, Android 14); the
   service start is wrapped because Android 12+ can refuse background starts;
@@ -308,6 +311,24 @@ adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
   carry `focusRing` so D-pad focus stays visible. Icons come from
   `material-icons-core` plus `AppIcons`; `material-icons-extended` is not needed
   (debug builds are not shrunk and it adds megabytes there).
+- **Standby, battery, TV**: *Standby screen* (`standby_enabled`, off) swaps the
+  dashboard for `StandbyScreen` after `STANDBY_AFTER_MS` without touch, key, stream or
+  pairing code, at window brightness 0.02; the clock drifts every minute against burn-in.
+  `dispatchTouchEvent` and the root `onPreviewKeyEvent` record activity; the first touch
+  or key only wakes. `ComponentActivity.dispatchKeyEvent` is library-restricted (lint
+  error), hence the Compose key hook, which also opens the in-session settings on OK,
+  Enter or Menu (remotes have no long press). `LowBatteryBadge` appears over the
+  picture at 15 % or less when not charging (sticky `ACTION_BATTERY_CHANGED`, read once
+  a minute while mirroring). On TV the dashboard keeps a 48 x 27 dp title-safe margin
+  and *Floating window* is hidden where picture-in-picture is unsupported.
+- **Picture delay (A/V sync)**: mirroring plays audio and video as they arrive, so a
+  Bluetooth output (100-300 ms) leaves sound behind the picture. The fix delays the
+  picture, not the sound: `DecoderPump` submits a frame only `pictureDelayNanos` after
+  it was queued, and the catch-up rule counts `VideoFrameQueue.dueDepth` (frames past the
+  delay) instead of `depth`, so held frames are not mistaken for a backlog. 0-500 ms,
+  `picture_delay_ms`; the 90-frame queue covers 500 ms at 60 fps. The dashboard suggests
+  it when an A2DP or LE audio output is present. RAOP's `Audio-Latency` header only
+  matters for buffered audio-only streams.
 - **Require a code (AirPlay PIN)**: off by default (`require_pin`). On: `dnssd_init`
   gets `pin_pw=1` (TXT `pw=true`, RAOP `sf=0x8c`) and `raop_set_plist(raop, "pin", 0)`
   draws a random code per pairing. `cb_display_pin` → `onDisplayPin` shows it
@@ -335,7 +356,8 @@ adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
   keeps `NativeBridge` (JNI function names) and `NativeBridge$Listener` with every
   implementation (`receiver_jni.c` calls its methods by name). A new JNI callback or
   `external fun` needs no new rule as long as it lives in those two types; anything
-  else the native side looks up by name does. Check with `dexdump` on the release APK.
+  else the native side looks up by name does. `scripts/check-jni-names.sh <apk>` (also a CI step) checks every `GetMethodID` name and
+  `Java_..._NativeBridge_*` function against the APK's dex.
 - **Launcher icon**: adaptive icon in `mipmap-anydpi-v26/ic_launcher.xml` (vector
   monitor and tablet in the Material You tones of `Palette.kt`: `#FFDCC2` background,
   `#FF9F43` monitor, `#904D00` tablet; scaled to 92 % so the corners stay in the 72 dp

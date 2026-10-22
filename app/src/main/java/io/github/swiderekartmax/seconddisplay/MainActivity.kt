@@ -59,6 +59,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -76,6 +77,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -169,6 +171,12 @@ class MainActivity : ComponentActivity() {
     // Android 10+ only lets the service bring this activity forward with "Display over other apps".
     private var canAutoOpen by mutableStateOf(true)
 
+    // In-session settings: long press on touch screens, OK or Menu on a remote (Android TV).
+    private var showMirrorSettings by mutableStateOf(false)
+    // Standby screen: last touch or key press, and whether the dimmed clock is up.
+    private var lastInteraction = SystemClock.elapsedRealtime()
+    private var inStandby by mutableStateOf(false)
+
     // Picture-in-picture: leaving the app while mirroring shrinks the stream into a floating window.
     private var inPictureInPicture by mutableStateOf(false)
     // Where the picture sits on screen, so the floating window animates out of it.
@@ -226,8 +234,33 @@ class MainActivity : ComponentActivity() {
             }
             var floatingWindowEnabled by remember { mutableStateOf(ReceiverServer.floatingWindowEnabled) }
             var requirePin by remember { mutableStateOf(ReceiverServer.requirePin) }
+            var standbyEnabled by remember { mutableStateOf(ReceiverServer.standbyEnabled) }
+            var pictureDelayMs by remember { mutableIntStateOf(ReceiverServer.pictureDelayMs) }
             val pairingCode by ReceiverServer.pairingCode.collectAsState()
             val pairedSenderCount by ReceiverServer.pairedSenderCount.collectAsState()
+            // Standby: dim to a clock after a minute without touch, keys or streams.
+            LaunchedEffect(standbyEnabled, mirroring, audioStreaming, pairingCode) {
+                inStandby = false
+                if (!standbyEnabled || mirroring || audioStreaming || pairingCode != null) return@LaunchedEffect
+                while (true) {
+                    delay(1_000)
+                    if (!inStandby && SystemClock.elapsedRealtime() - lastInteraction >= STANDBY_AFTER_MS) inStandby = true
+                }
+            }
+            LaunchedEffect(inStandby) {
+                window.attributes = window.attributes.apply {
+                    screenBrightness = if (inStandby) 0.02f else WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                }
+            }
+            // Battery: a long mirroring session on battery should not end in a surprise shutdown.
+            var lowBattery by remember { mutableStateOf<Int?>(null) }
+            LaunchedEffect(mirroring) {
+                lowBattery = null
+                while (mirroring) {
+                    lowBattery = lowBatteryLevel()
+                    delay(60_000)
+                }
+            }
             // Keep the floating-window shape in step with the picture; auto-enter only while mirroring.
             LaunchedEffect(mirroring, videoAspectRatio, mirrorBounds, floatingWindowEnabled) {
                 if (pipSupported) setPictureInPictureParams(pictureInPictureParams())
@@ -240,11 +273,12 @@ class MainActivity : ComponentActivity() {
             var startOnBoot by remember { mutableStateOf(ReceiverServer.startOnBoot) }
             var serviceName by remember { mutableStateOf(ReceiverServer.identity.serviceName) }
             val resolutionPreset by ReceiverServer.resolutionPreset.collectAsState()
-            var showMirrorSettings by remember { mutableStateOf(false) }
 
             SecondDisplayTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    if (inPictureInPicture && !mirroring) {
+                Surface(modifier = Modifier.fillMaxSize().onPreviewKeyEvent { handleKey(it.nativeKeyEvent) }) {
+                    if (inStandby) {
+                        StandbyScreen(serviceName = serviceName)
+                    } else if (inPictureInPicture && !mirroring) {
                         // The sender left while the floating window was up.
                         Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
                             Text("Stream ended", color = Palette.OverlayText, style = MaterialTheme.typography.bodyMedium)
@@ -301,6 +335,9 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                             )
+                            lowBattery?.takeIf { !inPictureInPicture }?.let { level ->
+                                LowBatteryBadge(level, Modifier.align(Alignment.TopEnd).padding(16.dp))
+                            }
                             if (debugOverlayEnabled && !inPictureInPicture) {
                                 TelemetryOverlay(
                                     telemetry = ReceiverServer.renderer.telemetry,
@@ -400,6 +437,18 @@ class MainActivity : ComponentActivity() {
                                 debugOverlayEnabled = enabled
                                 ReceiverServer.setDebugOverlayEnabled(enabled)
                             },
+                            pictureDelayMs = pictureDelayMs,
+                            onPictureDelayChanged = { ms ->
+                                pictureDelayMs = ms
+                                ReceiverServer.setPictureDelayMs(ms)
+                            },
+                            standbyEnabled = standbyEnabled,
+                            onStandbyEnabledChanged = { enabled ->
+                                standbyEnabled = enabled
+                                ReceiverServer.setStandbyEnabled(enabled)
+                                lastInteraction = SystemClock.elapsedRealtime()
+                            },
+                            pipSupported = pipSupported,
                             requirePin = requirePin,
                             onRequirePinChanged = { enabled ->
                                 requirePin = enabled
@@ -450,6 +499,42 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (wakeFromStandby()) return true
+        return super.dispatchTouchEvent(ev)
+    }
+
+    /** Every key reaches Compose first: wake from standby; on a remote, OK or Menu opens the in-session settings. */
+    private fun handleKey(event: android.view.KeyEvent): Boolean {
+        if (event.action == android.view.KeyEvent.ACTION_DOWN && wakeFromStandby()) return true
+        if (ReceiverServer.isMirroring.value && !showMirrorSettings && event.action == android.view.KeyEvent.ACTION_UP &&
+            event.keyCode in MIRROR_SETTINGS_KEYS
+        ) {
+            showMirrorSettings = true
+            return true
+        }
+        return false
+    }
+
+    /** Any touch or key counts as activity; the first one only wakes the screen from standby. */
+    private fun wakeFromStandby(): Boolean {
+        lastInteraction = SystemClock.elapsedRealtime()
+        if (!inStandby) return false
+        inStandby = false
+        return true
+    }
+
+    /** Battery percent when it is low and not charging, otherwise null. */
+    private fun lowBatteryLevel(): Int? {
+        val status = registerReceiver(null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED)) ?: return null
+        val level = status.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
+        val scale = status.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100)
+        val plugged = status.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, 0) != 0
+        if (level < 0 || scale <= 0 || plugged) return null
+        val percent = level * 100 / scale
+        return percent.takeIf { it <= LOW_BATTERY_PERCENT }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -573,6 +658,9 @@ class MainActivity : ComponentActivity() {
     private fun pictureInPictureAllowed(): Boolean {
         if (!pipSupported || !ReceiverServer.floatingWindowEnabled) return false
         val appOps = getSystemService(AppOpsManager::class.java) ?: return true
+        // Deprecated in SDK 37 without a replacement available on Android 11; still the way to
+        // read the per-app picture-in-picture switch there.
+        @Suppress("DEPRECATION")
         return appOps.unsafeCheckOpNoThrow(
             AppOpsManager.OPSTR_PICTURE_IN_PICTURE, applicationInfo.uid, packageName
         ) == AppOpsManager.MODE_ALLOWED
@@ -611,7 +699,52 @@ class MainActivity : ComponentActivity() {
 
         /** Started (visible) MainActivity instances; the service may bring a second one forward. */
         var startedActivities = 0
+
+        const val STANDBY_AFTER_MS = 60_000L
+        const val LOW_BATTERY_PERCENT = 15
+        val MIRROR_SETTINGS_KEYS = setOf(
+            android.view.KeyEvent.KEYCODE_DPAD_CENTER, android.view.KeyEvent.KEYCODE_ENTER,
+            android.view.KeyEvent.KEYCODE_NUMPAD_ENTER, android.view.KeyEvent.KEYCODE_MENU
+        )
     }
+}
+
+/** Dim clock with the receiver name. It drifts a little every minute so a panel does not burn in. */
+@Composable
+private fun StandbyScreen(serviceName: String) {
+    var now by remember { mutableStateOf(java.util.Date()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            now = java.util.Date()
+            delay(1_000)
+        }
+    }
+    val minute = (now.time / 60_000L).toInt()
+    val drift = Modifier.offset(x = ((minute * 37) % 61 - 30).dp, y = ((minute * 53) % 41 - 20).dp)
+    Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = drift) {
+            Text(
+                java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(now),
+                style = MaterialTheme.typography.displayLarge,
+                color = Palette.OverlayMuted
+            )
+            Spacer(Modifier.height(8.dp))
+            Text("$serviceName · ready for AirPlay", style = MaterialTheme.typography.bodyLarge, color = Palette.OverlayMuted)
+        }
+    }
+}
+
+/** Small corner badge over the mirrored picture when the battery runs low. */
+@Composable
+private fun LowBatteryBadge(percent: Int, modifier: Modifier = Modifier) {
+    Text(
+        "Battery $percent%",
+        modifier = modifier
+            .background(Palette.OverlayScrim, RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        color = Color(0xFFFFB4AB),
+        style = MaterialTheme.typography.labelLarge
+    )
 }
 
 /** The code a sender asks for while pairing; stays up until it pairs, starts streaming or gives up. */
@@ -899,6 +1032,11 @@ private fun DashboardScreen(
     hevcEnabled: Boolean,
     onHevcEnabledChanged: (Boolean) -> Unit,
     onDebugOverlayEnabledChanged: (Boolean) -> Unit,
+    pictureDelayMs: Int,
+    onPictureDelayChanged: (Int) -> Unit,
+    standbyEnabled: Boolean,
+    onStandbyEnabledChanged: (Boolean) -> Unit,
+    pipSupported: Boolean,
     requirePin: Boolean,
     onRequirePinChanged: (Boolean) -> Unit,
     pairedSenderCount: Int,
@@ -921,6 +1059,7 @@ private fun DashboardScreen(
 ) {
     var showNameDialog by remember { mutableStateOf(false) }
     var showReportDialog by remember { mutableStateOf(false) }
+    var showDelayDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val configuration = LocalConfiguration.current
     val context = LocalContext.current
@@ -1018,6 +1157,20 @@ private fun DashboardScreen(
                 checked = audioEnabled,
                 onToggle = { onAudioEnabledChanged(!audioEnabled) }
             )
+            if (audioEnabled) {
+                val bluetooth = remember(showDelayDialog) { ReceiverServer.isBluetoothAudioOutput(context) }
+                SettingRow(
+                    title = "Picture delay",
+                    supporting = when {
+                        pictureDelayMs > 0 -> "$pictureDelayMs ms, to match the sound"
+                        bluetooth -> "Bluetooth audio lags the picture: delay the picture to match"
+                        else -> "Off. For Bluetooth headphones or speakers"
+                    },
+                    icon = AppIcons.Timer,
+                    onClick = { showDelayDialog = true },
+                    trailing = { TextButton(onClick = { showDelayDialog = true }) { Text("Adjust") } }
+                )
+            }
             SettingRow(
                 title = "Open when a stream starts",
                 supporting = if (canAutoOpen) "The receiver comes to the front on its own"
@@ -1033,13 +1186,22 @@ private fun DashboardScreen(
                     }
                 }
             )
+            if (pipSupported) {
+                SwitchRow(
+                    title = "Floating window",
+                    supporting = if (floatingWindowEnabled) "Home while mirroring keeps the picture in a small window"
+                                 else "Home while mirroring disconnects",
+                    icon = AppIcons.PictureInPicture,
+                    checked = floatingWindowEnabled,
+                    onToggle = { onFloatingWindowEnabledChanged(!floatingWindowEnabled) }
+                )
+            }
             SwitchRow(
-                title = "Floating window",
-                supporting = if (floatingWindowEnabled) "Home while mirroring keeps the picture in a small window"
-                             else "Home while mirroring disconnects",
-                icon = AppIcons.PictureInPicture,
-                checked = floatingWindowEnabled,
-                onToggle = { onFloatingWindowEnabledChanged(!floatingWindowEnabled) }
+                title = "Standby screen",
+                supporting = "After a minute idle: a dim clock until a stream starts or you touch the screen",
+                icon = AppIcons.Clock,
+                checked = standbyEnabled,
+                onToggle = { onStandbyEnabledChanged(!standbyEnabled) }
             )
             SwitchRow(
                 title = "Run in background",
@@ -1191,7 +1353,10 @@ private fun DashboardScreen(
     // Launchers can lay the window out at a few dp wide while animating a relaunch.
     // Material 3 ListItem then measures its text with negative constraints and throws
     // (IllegalArgumentException in ListItemMeasurePolicy), which killed the app on reopen.
-    BoxWithConstraints(Modifier.fillMaxSize()) {
+    // TVs crop the picture edges (overscan): keep the dashboard inside the title-safe area.
+    val tvSafeArea = if (remember(context) { ReceiverIdentity.isTvDevice(context) })
+        Modifier.padding(horizontal = 48.dp, vertical = 27.dp) else Modifier
+    BoxWithConstraints(Modifier.fillMaxSize().then(tvSafeArea)) {
         if (maxWidth < MIN_DASHBOARD_WIDTH) {
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface))
             return@BoxWithConstraints
@@ -1266,6 +1431,35 @@ private fun DashboardScreen(
                 }
             }
         }
+    }
+
+    if (showDelayDialog) {
+        var draft by remember { mutableFloatStateOf(pictureDelayMs.toFloat()) }
+        AlertDialog(
+            onDismissRequest = { showDelayDialog = false },
+            icon = { Icon(AppIcons.Timer, contentDescription = null) },
+            title = { Text("Picture delay") },
+            text = {
+                Column {
+                    Text(
+                        "Bluetooth headphones and speakers play sound 100-300 ms late. Delaying the " +
+                            "picture by the same amount brings them back in sync. It also delays " +
+                            "the mouse on an extended display, so keep it at 0 with the built-in speaker."
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Text("${draft.toInt()} ms", style = MaterialTheme.typography.titleLarge)
+                    Slider(
+                        value = draft,
+                        onValueChange = { draft = (it / 10f).roundToInt() * 10f },
+                        valueRange = 0f..ReceiverServer.MAX_PICTURE_DELAY_MS.toFloat(),
+                        // Applied on release, so a stream can be checked while adjusting.
+                        onValueChangeFinished = { onPictureDelayChanged(draft.toInt()) }
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { onPictureDelayChanged(draft.toInt()); showDelayDialog = false }) { Text("Done") } },
+            dismissButton = { TextButton(onClick = { draft = 0f; onPictureDelayChanged(0) }) { Text("Reset") } }
+        )
     }
 
     if (showReportDialog) {

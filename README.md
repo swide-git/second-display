@@ -129,6 +129,8 @@ On the dashboard (when nothing is connected):
 | Resolution | tile under the status card | Size offered to the sender; tap to open the list |
 | Orientation | tile under the status card | Landscape, portrait, or auto (devices with a rotation sensor) |
 | Speaker | Settings | Play sound through the device speakers |
+| Picture delay | Settings (with Speaker on) | 0-500 ms: delays the picture so it matches Bluetooth headphones or speakers, which play sound late. Suggested when Bluetooth output is active |
+| Standby screen | Settings (off by default) | After a minute idle the screen dims to a slowly drifting clock with the receiver name; a stream, touch or key wakes it |
 | Open when a stream starts | Settings | Needs *Display over other apps*; tap **Allow** to grant it |
 | Floating window | Settings | Home while mirroring keeps the picture in a picture-in-picture window; off: Home disconnects |
 | Run in background | Settings | Keep the receiver discoverable after you leave the app. Off: the receiver stops as soon as the app leaves the screen |
@@ -145,7 +147,7 @@ On the dashboard (when nothing is connected):
 
 The version in the top bar opens the releases page; it turns into **Update to vX.Y.Z** when a newer release exists.
 
-During a session, **long press on the picture** for stats, speaker, resolution, HEVC and Disconnect. **Pinch** zooms the picture, **drag** moves a zoomed picture and **double tap** resets it.
+During a session, **long press on the picture** (on Android TV: **OK** or **Menu** on the remote) for stats, speaker, resolution, HEVC and Disconnect. Below 15 % battery and not charging, a small badge shows the level in the top-right corner. **Pinch** zooms the picture, **drag** moves a zoomed picture and **double tap** resets it.
 
 ---
 
@@ -172,7 +174,7 @@ brew install openjdk@17
 brew install --cask android-commandlinetools android-platform-tools
 export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
 export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
-sdkmanager --sdk_root=$ANDROID_HOME "platforms;android-36" "build-tools;35.0.0" "ndk;27.3.13750724" "cmake;3.22.1"
+sdkmanager --sdk_root=$ANDROID_HOME "platforms;android-37.0" "build-tools;37.0.0" "ndk;27.3.13750724" "cmake;3.22.1"
 ```
 
 Build, test and install:

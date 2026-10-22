@@ -32,7 +32,9 @@ class VideoRenderer(
     @Volatile internal var hevcDecoder: VideoDecoderSupport.Hevc? = null
     private val worker = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "Receiver decoder") }
     // Fields below are confined to worker.
-    private val decoderPump = DecoderPump(input)
+    /** Shows each picture this much later, to line it up with Bluetooth audio (0 = as soon as decoded). */
+    @Volatile internal var pictureDelayNanos: Long = 0L
+    private val decoderPump = DecoderPump(input, { pictureDelayNanos })
     private var codecGeneration = -1L
     private var createFailures = 0
     private var nextCreateAttempt = 0L
@@ -225,7 +227,8 @@ class VideoRenderer(
                     // prediction chain needs it) but only the newest reaches the screen, so the
                     // image jumps forward instead of replaying the stall. Showing one frame per
                     // CATCH_UP_MAX_FREEZE_NS keeps it alive if the decoder itself falls behind.
-                    val show = render && (input.depth() <= CATCH_UP_DEPTH ||
+                    // Frames held back by the picture delay are not a backlog.
+                    val show = render && (input.dueDepth(available, pictureDelayNanos) <= CATCH_UP_DEPTH ||
                         available - lastRenderedNanos >= CATCH_UP_MAX_FREEZE_NS)
                     decoder.releaseOutputBuffer(index, show)
                     val releasedAt = System.nanoTime()

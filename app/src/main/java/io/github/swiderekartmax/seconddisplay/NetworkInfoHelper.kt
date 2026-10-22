@@ -34,9 +34,11 @@ object NetworkInfoHelper {
         )
     }
 
+    fun isHotspotInterface(name: String): Boolean = HOTSPOT_PREFIXES.any { name.startsWith(it) }
+
     fun getHotspotAddress(): String? = runCatching {
         Collections.list(NetworkInterface.getNetworkInterfaces())
-            .filter { intf -> intf.isUp && HOTSPOT_PREFIXES.any { intf.name.startsWith(it) } }
+            .filter { intf -> intf.isUp && isHotspotInterface(intf.name) }
             .flatMap { Collections.list(it.inetAddresses) }
             .firstOrNull { it is Inet4Address && !it.isLoopbackAddress }
             ?.hostAddress

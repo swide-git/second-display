@@ -17,7 +17,7 @@ internal object VideoDecoderSupport {
                  else info.name == "OMX.qcom.video.decoder.hevc") &&
                 runCatching {
                     info.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_HEVC).videoCapabilities
-                        .areSizeAndRateSupported(width, height, fps.toDouble())
+                        ?.areSizeAndRateSupported(width, height, fps.toDouble()) == true
                 }.getOrDefault(false)
         }?.let { Hevc(it.name, width, height) }
     }.onFailure { Log.w("SecondDisplay", "HEVC capability query failed", it) }.getOrNull()
