@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status bar and notification icon: the launcher glyph (ic_launcher_monochrome) cropped to
+     its bounds. Android uses only the alpha channel here; the colour comes from setColor(). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="60"
+    android:viewportHeight="60">
+    <group
+        android:translateX="-24"
+        android:translateY="-24">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M32,30 H68 A5,5 0 0 1 73,35 V39 H60 A8,8 0 0 0 52,47 V60 H32 A5,5 0 0 1 27,55 V35 A5,5 0 0 1 32,30 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M38,60 h8 v6 h-8 z M34.5,66 h15 a1.5,1.5 0 0 1 0,3 h-15 a1.5,1.5 0 0 1 0,-3 z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M60,42 h16 a5,5 0 0 1 5,5 v26 a5,5 0 0 1 -5,5 h-16 a5,5 0 0 1 -5,-5 v-26 a5,5 0 0 1 5,-5 z M60.5,49 h15 a1.5,1.5 0 0 1 0,3 h-15 a1.5,1.5 0 0 1 0,-3 z M60.5,55 h9 a1.5,1.5 0 0 1 0,3 h-9 a1.5,1.5 0 0 1 0,-3 z" />
+    </group>
+</vector>
