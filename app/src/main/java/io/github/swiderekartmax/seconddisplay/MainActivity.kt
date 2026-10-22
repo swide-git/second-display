@@ -573,6 +573,9 @@ class MainActivity : ComponentActivity() {
     private fun pictureInPictureAllowed(): Boolean {
         if (!pipSupported || !ReceiverServer.floatingWindowEnabled) return false
         val appOps = getSystemService(AppOpsManager::class.java) ?: return true
+        // Deprecated in SDK 37 without a replacement available on Android 11; still the way to
+        // read the per-app picture-in-picture switch there.
+        @Suppress("DEPRECATION")
         return appOps.unsafeCheckOpNoThrow(
             AppOpsManager.OPSTR_PICTURE_IN_PICTURE, applicationInfo.uid, packageName
         ) == AppOpsManager.MODE_ALLOWED

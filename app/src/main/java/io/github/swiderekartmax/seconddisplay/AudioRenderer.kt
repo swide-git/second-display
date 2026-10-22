@@ -64,7 +64,7 @@ class AudioRenderer(private val telemetry: StreamTelemetry? = null) {
      * call this (a mirroring session has both), so a second call while active is a no-op
      * apart from refreshing the codec label.
      */
-    fun beginSession(codec: String = "AAC-ELD") = synchronized(stateLock) {
+    fun beginSession(codec: String = "AAC-ELD"): Unit = synchronized(stateLock) {
         if (closed) return
         codecLabel = codec
         telemetry?.onAudioFormatConfigured(codec, SAMPLE_RATE, 2)
@@ -81,7 +81,7 @@ class AudioRenderer(private val telemetry: StreamTelemetry? = null) {
         }
     }
 
-    fun endSession() = synchronized(stateLock) {
+    fun endSession(): Unit = synchronized(stateLock) {
         if (!active && frameQueue.isEmpty()) return
         session++
         active = false

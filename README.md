@@ -172,7 +172,7 @@ brew install openjdk@17
 brew install --cask android-commandlinetools android-platform-tools
 export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
 export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
-sdkmanager --sdk_root=$ANDROID_HOME "platforms;android-36" "build-tools;35.0.0" "ndk;27.3.13750724" "cmake;3.22.1"
+sdkmanager --sdk_root=$ANDROID_HOME "platforms;android-37.0" "build-tools;37.0.0" "ndk;27.3.13750724" "cmake;3.22.1"
 ```
 
 Build, test and install:

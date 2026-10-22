@@ -271,8 +271,11 @@ adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
   defaults to 4 KB. Without it Google Play withholds the app from devices with 16 KB
   memory pages, which report "can't download" (a Galaxy S26 Ultra did). CI checks
   `llvm-readelf -lW` and `zipalign -c -P 16` on every build.
-- **Dependencies**: Compose BOM 2026.06.01 and activity-compose 1.13.0 are the newest
-  that build with AGP 8.9 and compileSdk 36; later BOMs need AGP 9.1 and compileSdk 37.
+- **Build toolchain**: AGP 9.4.1 with built-in Kotlin (no `org.jetbrains.kotlin.android`
+  in the app module; the root only pins the Kotlin Gradle plugin, 2.4.21), Gradle 9.8.2,
+  compileSdk 37 (`platforms;android-37.0`), targetSdk 36, Compose BOM 2026.09.00.
+  `kotlinOptions` is gone in AGP 9: JVM target is set in `kotlin { compilerOptions }`.
+  SDK 37 annotates more platform types as nullable, e.g. `videoCapabilities`.
 - **Platform rules (targetSdk 36)**: `startForeground` must pass
   `FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE` (manifest type, Android 14); the
   service start is wrapped because Android 12+ can refuse background starts;
