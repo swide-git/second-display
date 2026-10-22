@@ -123,6 +123,8 @@ On the dashboard (when nothing is connected):
 | Name | This receiver | Name shown in Screen Mirroring (default: *Second Display*) |
 | Restart receiver | This receiver | Re-announces the receiver on the network |
 | Require a code | This receiver | AirPlay PIN pairing: a new sender enters a random 4-digit code shown on the device; it is remembered afterwards (**Paired senders → Forget**) |
+| Notification buttons | notification | **Disconnect** during a session, **Stop** turns the receiver off until the app is opened again |
+| Quick Settings tile | swipe down → edit tiles | Shows whether the receiver runs; tap stops it, or opens the app to start it |
 | Report a problem | This receiver | Builds a report (version, device, last crash, the app's recent log) and copies it for a GitHub issue or shares it. Nothing is sent automatically |
 
 The version in the top bar opens the releases page; it turns into **Update to vX.Y.Z** when a newer release exists.
@@ -135,7 +137,7 @@ During a session, **long press on the picture** for stats, speaker, resolution, 
 
 | Symptom | Cause and fix |
 |---|---|
-| Device not listed in Screen Mirroring | Not on the same network, or the network isolates clients (common on office and guest Wi-Fi). Try **This receiver → Restart**, or turn on the device's hotspot and join it from the Mac: no router involved. |
+| Device not listed in Screen Mirroring | Not on the same network, or the network isolates clients (common on office and guest Wi-Fi). Try **This receiver → Restart**, or turn on the device's hotspot and join it from the Mac: no router involved. The status card says when the hotspot is on and shows its address. |
 | Session drops or the picture stutters | Usually the Wi-Fi link: 2.4 GHz is slow and crowded, and every frame crosses it twice (sender → router → device). Move both to **5 GHz** and/or pick a lower **Preferred Resolution**. |
 | Picture freezes after a while, app gone | The system closed it. See [Keep it alive](#3-keep-it-alive-xiaomi-samsung-huawei-oneplus-and-others). |
 | Black bars around the picture | The chosen resolution has a different aspect than the panel. Pick **Native** or a percentage. |

@@ -13,18 +13,34 @@ object NetworkInfoHelper {
     data class NetworkDetails(
         val ipAddress: String,
         val wifiSsid: String,
-        val isConnected: Boolean
+        val isConnected: Boolean,
+        /** This device's own hotspot address when the hotspot is on; senders can join it. */
+        val hotspotAddress: String? = null
     )
+
+    /** Soft AP interface names: Xiaomi and AOSP "ap0", Samsung "swlan0", some vendors "softap0". */
+    private val HOTSPOT_PREFIXES = listOf("ap", "swlan", "softap")
 
     fun getNetworkDetails(context: Context): NetworkDetails {
         val ip = getLocalIpAddress()
-        val (ssid, connected) = getWifiInfo(context)
+        val hotspot = getHotspotAddress()
+        val (ssid, _) = getWifiInfo(context)
+        val onlyHotspot = hotspot != null && ip == hotspot
         return NetworkDetails(
             ipAddress = ip ?: "Not connected",
-            wifiSsid = ssid,
-            isConnected = ip != null
+            wifiSsid = if (onlyHotspot) "No Wi-Fi" else ssid,
+            isConnected = ip != null,
+            hotspotAddress = hotspot
         )
     }
+
+    fun getHotspotAddress(): String? = runCatching {
+        Collections.list(NetworkInterface.getNetworkInterfaces())
+            .filter { intf -> intf.isUp && HOTSPOT_PREFIXES.any { intf.name.startsWith(it) } }
+            .flatMap { Collections.list(it.inetAddresses) }
+            .firstOrNull { it is Inet4Address && !it.isLoopbackAddress }
+            ?.hostAddress
+    }.getOrNull()
 
     fun getLocalIpAddress(): String? {
         return try {

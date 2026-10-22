@@ -217,6 +217,13 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(orientationSetting) {
                 updateOrientationMode(orientationSetting)
             }
+            // The hotspot or Wi-Fi can change while the app is open; keep the status card current.
+            LaunchedEffect(Unit) {
+                while (true) {
+                    delay(5_000)
+                    networkDetails = NetworkInfoHelper.getNetworkDetails(this@MainActivity)
+                }
+            }
             var floatingWindowEnabled by remember { mutableStateOf(ReceiverServer.floatingWindowEnabled) }
             var requirePin by remember { mutableStateOf(ReceiverServer.requirePin) }
             val pairingCode by ReceiverServer.pairingCode.collectAsState()
@@ -799,6 +806,14 @@ private fun StatusCard(
                     onClick = {},
                     label = { Text(networkDetails.ipAddress, maxLines = 1) },
                     leadingIcon = { Icon(Icons.Filled.Info, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                )
+            }
+            networkDetails.hotspotAddress?.let { address ->
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    "Hotspot is on ($address): a Mac joined to this device's hotspot can connect too, no router needed.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
         }

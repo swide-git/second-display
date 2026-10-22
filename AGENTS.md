@@ -316,6 +316,14 @@ adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
   base64 ed25519 key (`paired_senders`, "key<TAB>name"); `nativeSetTrustedSenders` loads
   them before `nativeStart`, and `cb_check_register` lets them skip the code. Toggling
   restarts the server because `pw=` is in the mDNS record.
+- **Notification, tile, hotspot hint**: the service notification has **Disconnect**
+  (`ACTION_DISCONNECT` → `disconnectClient`, only during a session) and **Stop**
+  (`ACTION_STOP`). `ReceiverTileService` (Quick Settings) shows `ReceiverService.isRunning`;
+  a tap stops the receiver or opens the app, because starting a foreground service from a
+  tile is not reliably allowed. The service calls `ReceiverTileService.refresh` on create
+  and destroy. `NetworkInfoHelper.getHotspotAddress` finds the soft AP by interface name
+  (`ap*`, `swlan*`, `softap*`); the status card then says a Mac can join the hotspot.
+  The dashboard refreshes network details every 5 s.
 - **Problem reports**: `SecondDisplayApp` installs `ProblemReport`'s uncaught-exception
   recorder (`files/last-crash.txt`, then the default handler). *Report a problem* builds
   the report off the main thread: summary (version, device, Android, page size), the last
