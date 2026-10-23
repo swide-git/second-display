@@ -194,10 +194,45 @@ static void cb_conn_reset(void *cls, int reason) {
     call_void(g_on_stream_error, NULL);
 }
 
+/* AirPlay video (HLS, the YouTube app): the core fetches playlists from the sender
+ * and serves them on http://localhost:7000; Kotlin plays that URL with ExoPlayer.
+ * The sender polls /playback_info about once a second, answered from this cache,
+ * which Kotlin refreshes; duration -1 tells the core the video has finished. */
+static jmethodID g_on_video_play, g_on_video_seek, g_on_video_rate, g_on_video_stop;
+static pthread_mutex_t g_playback_lock = PTHREAD_MUTEX_INITIALIZER;
+static double g_pb_duration, g_pb_position = -1.0;   /* guarded by g_playback_lock */
+static float g_pb_rate;                              /* guarded by g_playback_lock */
+static bool g_pb_buffer_empty, g_pb_finished;        /* guarded by g_playback_lock */
+/* Set before the HTTP worker starts and cleared after it is joined, so core
+ * callbacks may read it without g_lock (nativeStop holds g_lock while joining). */
+static raop_t *volatile g_cb_raop;
+static char *g_hls_languages;                        /* the core keeps the pointer */
+
+static void playback_reset(void) {
+    pthread_mutex_lock(&g_playback_lock);
+    g_pb_duration = 0.0;
+    g_pb_position = -1.0;   /* "not available yet": the core answers without a plist */
+    g_pb_rate = 0.0f;
+    g_pb_buffer_empty = true;
+    g_pb_finished = false;
+    pthread_mutex_unlock(&g_playback_lock);
+}
+
 static void cb_video_reset(void *cls, reset_type_t t) {
     LOGW("video reset by core (type %d)", (int) t);
     /* Normal TEARDOWN also invokes video_reset, often before joining the
-     * mirror worker. Its running=false callback owns normal session cleanup. */
+     * mirror worker. Its running=false callback owns normal session cleanup.
+     * An AirPlay video that ended or was replaced by a new sender is ours to
+     * release, as uxplay.cpp does in its own video_reset. */
+    if (t == RESET_TYPE_HLS_SHUTDOWN || t == RESET_TYPE_NOHOLD) {
+        raop_t *raop = g_cb_raop;
+        if (raop) {
+            raop_destroy_airplay_video(raop, -1);
+            if (t == RESET_TYPE_HLS_SHUTDOWN) raop_remove_hls_connections(raop);
+        }
+        playback_reset();
+        call_void(g_on_video_stop, NULL);
+    }
 }
 
 /* Verified mirror-stream lifetime: true when the mirror data thread starts,
@@ -431,12 +466,75 @@ static void cb_display_pin(void *cls, char *pin) {
     call_void(g_on_display_pin, jpin);
     if (jpin) (*env)->DeleteLocalRef(env, jpin);
 }
-static void cb_on_video_play(void *cls, const char *location, const float pos) {}
-static void cb_on_video_scrub(void *cls, const float pos) {}
-static void cb_on_video_rate(void *cls, const float rate) {}
-static void cb_on_video_stop(void *cls) {}
-static void cb_on_video_info(void *cls, playback_info_t *info) {}
-static float cb_on_playlist_remove(void *cls) { return 0.0f; }
+static void call_float(jmethodID mid, float value) {
+    JNIEnv *env = env_for_thread();
+    if (!env) return;
+    jobject listener = listener_snapshot(env);
+    if (!listener) return;
+    (*env)->CallVoidMethod(env, listener, mid, (jfloat) value);
+    (*env)->DeleteLocalRef(env, listener);
+    if ((*env)->ExceptionCheck(env)) { (*env)->ExceptionDescribe(env); (*env)->ExceptionClear(env); }
+}
+
+static void cb_on_video_play(void *cls, const char *location, const float pos) {
+    LOGI("AirPlay video: play from %.1f s", pos);
+    playback_reset();
+    JNIEnv *env = env_for_thread();
+    if (!env || !location) return;
+    jobject listener = listener_snapshot(env);
+    if (!listener) return;
+    jstring url = (*env)->NewStringUTF(env, location);
+    if (url) {
+        (*env)->CallVoidMethod(env, listener, g_on_video_play, url, (jfloat) pos);
+        (*env)->DeleteLocalRef(env, url);
+    }
+    (*env)->DeleteLocalRef(env, listener);
+    if ((*env)->ExceptionCheck(env)) { (*env)->ExceptionDescribe(env); (*env)->ExceptionClear(env); }
+}
+
+static void cb_on_video_scrub(void *cls, const float pos) {
+    LOGI("AirPlay video: seek to %.1f s", pos);
+    call_float(g_on_video_seek, pos);
+}
+
+/* 1 = play, 0 = pause; the sender sends nothing else. */
+static void cb_on_video_rate(void *cls, const float rate) {
+    LOGI("AirPlay video: rate %.1f", rate);
+    call_float(g_on_video_rate, rate);
+}
+
+static void cb_on_video_stop(void *cls) {
+    LOGI("AirPlay video: stop");
+    call_void(g_on_video_stop, NULL);
+}
+
+static void cb_on_video_info(void *cls, playback_info_t *info) {
+    pthread_mutex_lock(&g_playback_lock);
+    if (g_pb_finished) {
+        info->duration = -1.0;
+        info->position = -1.0;
+    } else {
+        info->duration = g_pb_duration;
+        info->position = g_pb_position;
+    }
+    info->seek_start = 0.0;
+    info->seek_duration = g_pb_duration > 0.0 ? g_pb_duration : 0.0;
+    info->rate = g_pb_rate;
+    info->playback_buffer_empty = g_pb_buffer_empty;
+    info->playback_buffer_full = !g_pb_buffer_empty;
+    info->ready_to_play = true;
+    info->playback_likely_to_keep_up = true;
+    pthread_mutex_unlock(&g_playback_lock);
+}
+
+/* The sender switches to another video in its queue: pause and report where we stopped. */
+static float cb_on_playlist_remove(void *cls) {
+    call_float(g_on_video_rate, 0.0f);
+    pthread_mutex_lock(&g_playback_lock);
+    float position = g_pb_position > 0.0 ? (float) g_pb_position : 0.0f;
+    pthread_mutex_unlock(&g_playback_lock);
+    return position;
+}
 static void cb_video_report_size(void *cls, float *a, float *b, float *c, float *d) {}
 
 JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
@@ -462,6 +560,11 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     g_on_client_registered = (*env)->GetMethodID(env, cls, "onClientRegistered",
                                                  "(Ljava/lang/String;Ljava/lang/String;)V");
     if (!(g_on_display_pin && g_on_client_registered)) return JNI_ERR;
+    g_on_video_play = (*env)->GetMethodID(env, cls, "onVideoPlay", "(Ljava/lang/String;F)V");
+    g_on_video_seek = (*env)->GetMethodID(env, cls, "onVideoSeek", "(F)V");
+    g_on_video_rate = (*env)->GetMethodID(env, cls, "onVideoRate", "(F)V");
+    g_on_video_stop = (*env)->GetMethodID(env, cls, "onVideoStop", "()V");
+    if (!(g_on_video_play && g_on_video_seek && g_on_video_rate && g_on_video_stop)) return JNI_ERR;
     if (!(g_on_video_frame && g_on_audio_frame && g_on_audio_volume && g_on_audio_flush
           && g_on_client_connected && g_on_client_disconnected
           && g_on_mirror_running && g_on_audio_running && g_on_stream_error
@@ -489,7 +592,8 @@ JNIEXPORT jint Java_io_github_swiderekartmax_seconddisplay_NativeBridge_nativeSt
                                                                jstring keyFile, jstring deviceId,
                                                                jstring serviceName,
                                                                jint width, jint height, jint maxFps, jboolean allowHevc,
-                                                               jboolean requirePin) {
+                                                               jboolean requirePin, jboolean videoPlayback,
+                                                               jstring languages) {
     pthread_mutex_lock(&g_lock);
     if (g_raop) {
         int port = raop_get_port(g_raop);
@@ -554,6 +658,15 @@ JNIEXPORT jint Java_io_github_swiderekartmax_seconddisplay_NativeBridge_nativeSt
     raop_set_plist(raop, "maxFPS", maxFps);
     /* 0 = a fresh random 4-digit code for every pairing, shown through display_pin. */
     if (requirePin == JNI_TRUE) raop_set_plist(raop, "pin", 0);
+    if (videoPlayback == JNI_TRUE) {
+        raop_set_plist(raop, "hls", 1);
+        /* Audio and subtitle tracks are picked from these ("pl-PL:pl:en"); never empty. */
+        const char *langs = languages ? (*env)->GetStringUTFChars(env, languages, NULL) : NULL;
+        free(g_hls_languages);
+        g_hls_languages = strdup(langs && *langs ? langs : "en");
+        if (langs) (*env)->ReleaseStringUTFChars(env, languages, langs);
+        raop_set_lang(raop, NULL, NULL, g_hls_languages);
+    }
 
     /* /info asserts on raop->dnssd and reads its TXT records, so the dnssd
      * object must exist and be attached BEFORE the HTTP listener can accept
@@ -579,6 +692,10 @@ JNIEXPORT jint Java_io_github_swiderekartmax_seconddisplay_NativeBridge_nativeSt
     }
     g_allow_hevc = allowHevc == JNI_TRUE;
     dnssd_set_airplay_features(dnssd, 42, g_allow_hevc ? 1 : 0);
+    /* bit 0: AirPlay video, bit 4: HTTP Live Streaming (as uxplay -hls sets them) */
+    dnssd_set_airplay_features(dnssd, 0, videoPlayback == JNI_TRUE ? 1 : 0);
+    dnssd_set_airplay_features(dnssd, 4, videoPlayback == JNI_TRUE ? 1 : 0);
+    LOGI("AirPlay video advertisement: %s", videoPlayback == JNI_TRUE ? "enabled" : "disabled");
     LOGI("HEVC advertisement: %s", g_allow_hevc ? "enabled" : "disabled");
     raop_set_dnssd(raop, dnssd);
 
@@ -601,9 +718,12 @@ JNIEXPORT jint Java_io_github_swiderekartmax_seconddisplay_NativeBridge_nativeSt
         pthread_mutex_unlock(&g_lock);
         return -5;
     }
+    g_cb_raop = raop;
+    playback_reset();
     rc = raop_start_httpd(raop, &port);
     if (rc < 0 || port != 7000) {
         raop_stop_httpd(raop);
+        g_cb_raop = NULL;
         dnssd_unregister_raop(dnssd);
         dnssd_unregister_airplay(dnssd);
         dnssd_destroy(dnssd);
@@ -654,6 +774,7 @@ JNIEXPORT void Java_io_github_swiderekartmax_seconddisplay_NativeBridge_nativeSt
      * (Joining can fire conn_destroy callbacks; they take g_listener_lock,
      * never g_lock, so holding g_lock here cannot deadlock.) */
     if (g_raop) raop_stop_httpd(g_raop);
+    g_cb_raop = NULL;
     if (g_dnssd) {
         dnssd_unregister_raop(g_dnssd);
         dnssd_unregister_airplay(g_dnssd);
@@ -668,4 +789,19 @@ JNIEXPORT void Java_io_github_swiderekartmax_seconddisplay_NativeBridge_nativeSt
     audio_decoder_release_locked();   /* no RTP thread can call cb_audio_process past raop_destroy */
     pthread_mutex_unlock(&g_audio_lock);
     pthread_mutex_unlock(&g_lock);
+}
+
+/* Kotlin's player state for the sender's /playback_info polls; finished = the video
+ * ended or was closed on this device, which makes the core end the AirPlay video. */
+JNIEXPORT void Java_io_github_swiderekartmax_seconddisplay_NativeBridge_nativeSetPlaybackInfo(JNIEnv *env, jclass cls,
+                                                                                 jdouble duration, jdouble position,
+                                                                                 jfloat rate, jboolean buffering,
+                                                                                 jboolean finished) {
+    pthread_mutex_lock(&g_playback_lock);
+    g_pb_duration = duration;
+    g_pb_position = position;
+    g_pb_rate = rate;
+    g_pb_buffer_empty = buffering == JNI_TRUE;
+    g_pb_finished = finished == JNI_TRUE;
+    pthread_mutex_unlock(&g_playback_lock);
 }

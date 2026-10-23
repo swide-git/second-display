@@ -44,6 +44,22 @@ object NativeBridge {
 
         /** A sender paired with the code; store [publicKey] so it skips the code next time. */
         fun onClientRegistered(publicKey: String, name: String) {}
+
+        /**
+         * AirPlay video (the YouTube app): play [url], an HLS playlist served by the core on
+         * localhost, from [startSec]. This and the calls below run on the core's HTTP thread
+         * and must not block it: that thread also serves the playlists to the player.
+         */
+        fun onVideoPlay(url: String, startSec: Float) {}
+
+        /** The sender moved the AirPlay video to [positionSec]. */
+        fun onVideoSeek(positionSec: Float) {}
+
+        /** 1 = play, 0 = pause. */
+        fun onVideoRate(rate: Float) {}
+
+        /** The AirPlay video ended, was stopped on the sender, or a new sender took over. */
+        fun onVideoStop() {}
     }
 
     /** Audio codec tags shared with receiver_jni.c (AirPlay "ct" values; 0 = decoded PCM). */
@@ -64,7 +80,9 @@ object NativeBridge {
         height: Int,
         maxFps: Int,
         allowHevc: Boolean,
-        requirePin: Boolean
+        requirePin: Boolean,
+        videoPlayback: Boolean,
+        languages: String
     ): Int
 
     /** Senders paired with the code earlier (base64 ed25519 keys); call before [nativeStart]. */
@@ -72,6 +90,18 @@ object NativeBridge {
 
     /** Hex ed25519 public key owned by the server; advertise it as pk=. */
     external fun nativePublicKey(): String?
+
+    /**
+     * Player state for the sender's progress bar, in seconds. [finished] reports that the
+     * video ended or was closed here; the core then ends the AirPlay video session.
+     */
+    external fun nativeSetPlaybackInfo(
+        durationSec: Double,
+        positionSec: Double,
+        rate: Float,
+        buffering: Boolean,
+        finished: Boolean
+    )
 
     external fun nativeStop()
 }
