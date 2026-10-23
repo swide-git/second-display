@@ -15,7 +15,7 @@ set -euo pipefail
 repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
 tools="$repo_dir/.tools"
 out="$repo_dir/app/src/main/cpp/deps"
-api=28
+api=26
 abi="${1:-arm64-v8a}"
 case "$abi" in
   arm64-v8a)   openssl_target=android-arm64; host=aarch64-linux-android; cc_prefix=aarch64-linux-android ;;

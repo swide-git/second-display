@@ -37,7 +37,7 @@ android {
         // Kotlin package (namespace), not this value.
         applicationId = "io.github.swidegit.seconddisplay"
         // Android 11+ phones and tablets. Portals (Android 9-10) are not supported by this build.
-        minSdk = 28
+        minSdk = 26
         targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName

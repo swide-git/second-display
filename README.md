@@ -2,7 +2,7 @@
   <img src="docs/images/second_display_icon.svg" width="160" alt="Second Display icon" />
   <h1>Second Display</h1>
   <p><strong>Turn an Android tablet or phone into a wireless display and speaker for your Mac, iPhone and iPad.</strong></p>
-  <p>AirPlay screen mirroring and extended display receiver for Android 9+.</p>
+  <p>AirPlay screen mirroring and extended display receiver for Android 8+.</p>
   <p><a href="https://github.com/swide-git/second-display/releases/latest"><strong>⬇ Download the latest release (APK)</strong></a> · <a href="https://github.com/swide-git/second-display/releases">All releases</a></p>
 </div>
 
@@ -56,7 +56,7 @@ Second Display is an independent community project and is not affiliated with Ap
 
 ## Requirements
 
-- **Android**: 9 or newer (API 28+), including older Android TV sets; built for Android 16 (targetSdk 36), 16 KB memory pages supported.
+- **Android**: 8 or newer (API 26+), including older Android TV sets; built for Android 16 (targetSdk 36), 16 KB memory pages supported.
 - **CPU**: ARM, 64-bit (`arm64-v8a`) or 32-bit (`armeabi-v7a`). The 32-bit build is for Google TV sets and other devices that run a 32-bit Android on a 64-bit chip, typically with 2 GB of RAM.
 - **Network**: device and sender on the **same Wi-Fi network** (5 GHz strongly recommended), or the sender joined to the device's own **hotspot**.
 - **Sender**: Mac, iPhone or iPad (Screen Mirroring / AirPlay).
@@ -239,7 +239,7 @@ Compared with [upstream Wormhole Display](https://github.com/pgodlews/wormhole-d
 - **New name and identity**: *Second Display*, application ID `io.github.swidegit.seconddisplay` (installs alongside the original, not over it), new icon.
 
 - **Android 11+ launch crash fixed**: the display was read from the application context, which throws on API 30+.
-- **Targets current Android** (minSdk 28, targetSdk 36): notification permission (Android 13), foreground-service type (Android 14), edge-to-edge with hidden system bars (Android 15), orientation lock kept on tablets (Android 16). Portals are no longer supported; Android 9-10 phones and TV sets are.
+- **Targets current Android** (minSdk 26, targetSdk 36): notification permission (Android 13), foreground-service type (Android 14), edge-to-edge with hidden system bars (Android 15), orientation lock kept on tablets (Android 16). Portals are no longer supported; phones and TV sets from Android 8 on are.
 - **Stable on lossy Wi-Fi**: 90-frame decoder buffer (was 12) with catch-up that shows only the newest frame, and a low-latency Wi-Fi lock.
 - **Material You interface** (wallpaper colours, light and dark mode), **preferred resolution** setting, **pinch to zoom**, **picture-in-picture** floating window, **version indicator** with GitHub release check, and **in-session settings** on long press.
 
