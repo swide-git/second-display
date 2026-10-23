@@ -149,7 +149,8 @@ jobs:
           work="$(mktemp -d)"
           unzip -q dist/second-display.apk 'lib/*' -d "$work"
           status=0
-          for so in "$work"/lib/*/*.so; do
+          # The requirement is for 64-bit libraries; 32-bit ARM devices use 4 KB pages.
+          for so in "$work"/lib/arm64-v8a/*.so; do
             align="$("$readelf" -lW "$so" | awk '/LOAD/ {print $NF}' | sort -u | tr '\n' ' ')"
             echo "$(basename "$so"): $align"
             case "$align" in *0x1000*|*0x2000*) status=1 ;; esac

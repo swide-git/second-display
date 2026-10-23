@@ -13,8 +13,10 @@ file(GLOB UX_SOURCES CONFIGURE_DEPENDS ${UX}/*.c ${UX}/llhttp/*.c ${UX}/playfair
 # Discovery uses the bundled internal mDNS responder (mdnsd); the dns_sd
 # (Bonjour/Avahi) backend is intentionally absent.
 add_library(mirror-core STATIC ${UX_SOURCES})
+# openssl/configuration.h is per ABI (32- vs 64-bit BN_ULONG) and must win over the shared headers.
 target_include_directories(mirror-core PUBLIC
     ${UX} ${UX}/llhttp ${UX}/playfair ${UX}/mdnsd
+    ${DEPS}/openssl/include-abi/${ANDROID_ABI}
     ${DEPS}/openssl/include ${DEPS}/plist/include)
 target_compile_definitions(mirror-core PRIVATE
     STANDALONE NOHOLD TARGET_POSIX _REENTRANT
