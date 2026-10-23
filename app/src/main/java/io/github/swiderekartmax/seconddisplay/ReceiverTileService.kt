@@ -29,7 +29,7 @@ class ReceiverTileService : TileService() {
         val running = ReceiverService.isRunning
         tile.state = if (running) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         tile.label = "Second Display"
-        tile.subtitle = if (running) "Receiving" else "Off"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) tile.subtitle = if (running) "Receiving" else "Off"
         tile.updateTile()
     }
 
@@ -41,7 +41,7 @@ class ReceiverTileService : TileService() {
             ReceiverServer.stopServer()
             qsTile?.apply {
                 state = Tile.STATE_INACTIVE
-                subtitle = "Off"
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) subtitle = "Off"
                 updateTile()
             }
             return

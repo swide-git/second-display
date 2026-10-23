@@ -2,6 +2,7 @@ package io.github.swiderekartmax.seconddisplay
 
 import android.content.Context
 import android.net.wifi.WifiManager
+import android.os.Build
 import java.security.SecureRandom
 
 /**
@@ -99,7 +100,14 @@ class ReceiverIdentity(context: Context) {
     fun holdWifiLock() {
         if (wifiLock == null) {
             wifiLock = runCatching {
-                wifi.createWifiLock(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, "seconddisplay").apply {
+                // Android 9 has no low-latency mode; high-perf is its closest equivalent.
+                @Suppress("DEPRECATION")
+                val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+                } else {
+                    WifiManager.WIFI_MODE_FULL_HIGH_PERF
+                }
+                wifi.createWifiLock(mode, "seconddisplay").apply {
                     setReferenceCounted(false); acquire()
                 }
             }.getOrNull()

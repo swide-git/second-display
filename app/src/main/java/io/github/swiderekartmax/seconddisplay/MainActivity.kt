@@ -21,6 +21,9 @@ import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.View
 import android.view.WindowManager
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.enableEdgeToEdge
@@ -192,7 +195,11 @@ class MainActivity : ComponentActivity() {
         // transiently) and let the mirror use the cutout area too.
         enableEdgeToEdge()
         window.attributes = window.attributes.apply {
-            layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            layoutInDisplayCutoutMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            } else {
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
         }
         requestNotificationPermission()
 
@@ -544,9 +551,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun hideSystemBars() {
-        window.insetsController?.apply {
-            hide(android.view.WindowInsets.Type.systemBars())
-            systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        // The compat controller maps to system UI flags on Android 9-10.
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            hide(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
     }
 
@@ -658,12 +666,15 @@ class MainActivity : ComponentActivity() {
     private fun pictureInPictureAllowed(): Boolean {
         if (!pipSupported || !ReceiverServer.floatingWindowEnabled) return false
         val appOps = getSystemService(AppOpsManager::class.java) ?: return true
-        // Deprecated in SDK 37 without a replacement available on Android 11; still the way to
+        // Deprecated in SDK 37 without a replacement available on Android 9-11; still the way to
         // read the per-app picture-in-picture switch there.
         @Suppress("DEPRECATION")
-        return appOps.unsafeCheckOpNoThrow(
-            AppOpsManager.OPSTR_PICTURE_IN_PICTURE, applicationInfo.uid, packageName
-        ) == AppOpsManager.MODE_ALLOWED
+        val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_PICTURE_IN_PICTURE, applicationInfo.uid, packageName)
+        } else {
+            appOps.checkOpNoThrow(AppOpsManager.OPSTR_PICTURE_IN_PICTURE, applicationInfo.uid, packageName)
+        }
+        return mode == AppOpsManager.MODE_ALLOWED
     }
 
     // Home is a deliberate exit; not called when the service brings this activity forward.

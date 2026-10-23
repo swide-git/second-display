@@ -165,11 +165,15 @@ class ReceiverService : Service() {
 
     private fun enterForeground(contentText: String) {
         // Android 14+ requires the type at runtime to match the manifest declaration.
-        startForeground(
-            NOTIFICATION_ID,
-            buildNotification(contentText),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                buildNotification(contentText),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, buildNotification(contentText))
+        }
     }
 
     private fun launchMainActivity() {
