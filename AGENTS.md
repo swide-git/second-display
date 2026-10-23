@@ -108,6 +108,19 @@ Installing on a real device:
    → `VideoRenderer` → MediaCodec.
 6. Audio (AAC-ELD, 44.1 kHz stereo) is decrypted by the core and delivered to
    `audio_process`; the shim copies each frame to `AudioRenderer`.
+7. AirPlay video (HLS, YouTube app only; on unless *AirPlay video* is off): feature
+   bits 0 and 4 plus `raop_set_plist(raop, "hls", 1)`. The sender `POST /play`s a
+   `.../master.m3u8` location; the core fetches the playlists back from the sender
+   (FCUP over the reverse PTTH connection) and serves them rewritten at
+   `http://localhost:7000/master.m3u8`, then calls `on_video_play`. `VideoPlayback`
+   plays that URL with ExoPlayer (cleartext allowed for localhost only,
+   `res/xml/network_security_config.xml`); segments come straight from YouTube.
+   The sender polls `/playback_info` about once a second; the shim answers from a
+   cache that `VideoPlayback` refreshes every 500 ms (`nativeSetPlaybackInfo`).
+   Reporting `finished` (duration -1) makes the core fire `video_reset(HLS_SHUTDOWN)`,
+   where the shim destroys the airplay_video and drops the HLS connections, as
+   uxplay.cpp does. Every core callback runs on the single HTTP thread that also
+   serves the playlists to ExoPlayer: never block in them, post to the main thread.
 
 ## Windows and Linux
 
@@ -152,7 +165,7 @@ adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
 
 | Symptom | Cause | Fix / notes |
 |---|---|---|
-| Plain `curl http://…:7000/info` hangs, empty reply | The core drops requests **without a CSeq header** unless HLS support is on | Probe with the RTSP+CSeq recipe above, not curl |
+| Plain `curl http://…:7000/info` hangs or returns 404 | Without a **CSeq header** the core drops the request, or (AirPlay video on) treats it as a player request for an HLS playlist | Probe with the RTSP+CSeq recipe above, not curl |
 | Crash: `assertion "raop->dnssd" failed` on first /info | `/info` reads TXT records from the C dnssd object | `dnssd_init` + `dnssd_register_*` must complete before HTTP starts (done in `nativeStart`) |
 | Picker shows the device, connect fails instantly | Advertised `pk` ≠ the server's actual ed25519 key | Always advertise `raop_get_pk_str()` output; never a random/persisted key |
 | Mac mirrors at 1920×1080, looks wrong on the panel | UxPlay defaults advertise 1920×1080@30; **macOS mirrors at whatever you advertise** | `raop_set_plist(raop,"width"/"height"/"refreshRate"/"maxFPS", …)` - done from real display metrics in `nativeStart` |
@@ -445,6 +458,9 @@ device: uninstall first when switching (this resets the receiver identity and th
   advertised modes, and codec; the receiver advertises capabilities and renders
   what it is sent.
 - No PIN or password: any device on the LAN can connect. This is intentional.
+- AirPlay video is the YouTube app's HLS only (plus plain http(s) video URLs).
+  FairPlay-protected video (Apple TV+, Netflix and other paid services) needs Apple's
+  keys; there is no way to play it, only to mirror it.
 - macOS/iOS updates can and do break third-party receivers; treat
   `model`/`srcvers`/`features` as moving targets.
 - **GPLv3**: everything here links UxPlay. Never copy code from this repo into

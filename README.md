@@ -46,6 +46,7 @@ Second Display is an independent community project and is not affiliated with Ap
 - **Survives Wi-Fi hiccups**: a low-latency Wi-Fi lock keeps the radio awake, and a 90-frame decoder buffer absorbs the burst a sender delivers after a stall, catching up without replaying it.
 - **Hardware video decoding**: H.264, with experimental HEVC for senders that choose it.
 - **Sound through the device**, mutable from the dashboard.
+- **AirPlay video from YouTube**: the AirPlay button in the YouTube app on an iPhone or iPad sends the video itself rather than the screen. This device streams it from the internet in full quality, the phone stays the remote (play, pause, seek) and can lock its screen. On a TV remote, OK pauses and left/right skip 10 seconds. Videos protected with FairPlay (Apple TV+, Netflix and other paid services) cannot be played by any non-Apple receiver; mirror those instead.
 - **AirPlay speaker (audio-only)** from an iPhone or iPad, with cover art, title and progress full screen.
 - **Opens when you connect**: the receiver stays available in the background and brings itself full screen when a stream starts. It can also start at boot.
 - **Portrait, landscape or auto** orientation.
@@ -136,6 +137,7 @@ On the dashboard (when nothing is connected):
 | Run in background | Settings | Keep the receiver discoverable after you leave the app. Off: the receiver stops as soon as the app leaves the screen |
 | Start on boot | Settings | Start the receiver after a reboot (needs *Run in background*) |
 | Quit (×) | top bar | Stop the receiver and close the app, whatever *Run in background* says |
+| AirPlay video | Settings (on by default) | Lets the YouTube app send videos to play here instead of mirroring them; off: videos are mirrored with the rest of the screen |
 | H.265 video | Settings | Offer HEVC; the sender decides whether to use it. A Mac on Wi-Fi often stays on H.264 |
 | Stream stats | Settings | FPS, bitrate, resolution and codec in the top-left corner |
 | Name | This receiver | Name shown in Screen Mirroring (default: *Second Display*) |
@@ -225,7 +227,7 @@ See [the architecture notes](docs/architecture.md) for details.
 
 ## Privacy and security
 
-- Apart from the device that connects to it on the local network, the app makes one request: the dashboard asks `api.github.com` for the latest release number to show next to the installed version. No analytics, automatic crash reporting, ads or other external servers. *Report a problem* only builds a report on the device; you decide whether to paste or share it. Its only libraries are Jetpack Compose (UI), OpenSSL and libplist (AirPlay protocol).
+- Apart from the device that connects to it on the local network, the app makes one request: the dashboard asks `api.github.com` for the latest release number to show next to the installed version. No analytics, automatic crash reporting, ads or other external servers. *Report a problem* only builds a report on the device; you decide whether to paste or share it. An AirPlay video from YouTube is downloaded by the device directly from YouTube's servers, the same way the sender's app would. Its only libraries are Jetpack Compose (UI), Media3 ExoPlayer (AirPlay video), OpenSSL and libplist (AirPlay protocol).
 - By default it accepts screen-mirroring connections from **any device on your local network**. Turn on **Require a code** (This receiver) and a new Mac, iPhone or iPad must enter a 4-digit code shown on the device, once; paired senders are remembered and can be forgotten.
 
 ---

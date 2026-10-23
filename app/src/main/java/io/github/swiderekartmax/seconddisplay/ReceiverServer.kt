@@ -129,6 +129,12 @@ object ReceiverServer {
     /** New senders must enter a 4-digit code shown on this device (AirPlay PIN pairing). */
     var requirePin: Boolean = false
         private set
+
+    /** AirPlay video: the YouTube app sends the video itself, which this device streams. */
+    var videoPlaybackEnabled: Boolean = true
+        private set
+    private var videoSessionStartTime = 0L
+    private var videoClientName: String? = null
     private val _pairingCode = MutableStateFlow<String?>(null)
     /** The code a sender is waiting for, while it waits. */
     val pairingCode: StateFlow<String?> = _pairingCode.asStateFlow()
@@ -205,6 +211,8 @@ object ReceiverServer {
         runInBackground = prefs.getBoolean("run_in_background", true)
         floatingWindowEnabled = prefs.getBoolean("floating_window_enabled", true)
         requirePin = prefs.getBoolean("require_pin", false)
+        videoPlaybackEnabled = prefs.getBoolean("video_playback_enabled", true)
+        VideoPlayback.onEnded = { endVideoSession() }
         standbyEnabled = prefs.getBoolean("standby_enabled", false)
         pictureDelayMs = prefs.getInt("picture_delay_ms", 0).coerceIn(0, MAX_PICTURE_DELAY_MS)
         renderer.pictureDelayNanos = pictureDelayMs * 1_000_000L
@@ -291,6 +299,35 @@ object ReceiverServer {
             _pairingCode.value = null
             if (_statusText.value.startsWith("Code ")) _statusText.value = idleStatus
         }
+    }
+
+    fun setVideoPlaybackEnabled(enabled: Boolean) {
+        if (videoPlaybackEnabled == enabled) return
+        videoPlaybackEnabled = enabled
+        prefs.edit().putBoolean("video_playback_enabled", enabled).apply()
+        // The feature bits live in the mDNS record and the HLS switch in the server: re-announce.
+        restartServer()
+    }
+
+    /** Preferred audio and subtitle languages for AirPlay video, most wanted first ("pl-PL:pl:en"). */
+    private fun videoLanguages(): String {
+        val locales = appContext.resources.configuration.locales
+        val tags = (0 until locales.size()).flatMap { i ->
+            val locale = locales[i]
+            listOf(locale.toLanguageTag(), locale.language)
+        }
+        return (tags + "en").filter { it.isNotBlank() && it != "und" }.distinct().joinToString(":")
+    }
+
+    private fun endVideoSession() {
+        if (videoSessionStartTime > 0L) {
+            val duration = (System.currentTimeMillis() - videoSessionStartTime) / 1000
+            history.recordConnection(videoClientName ?: "AirPlay video", videoSessionStartTime, duration, "Video", "HLS")
+            _recentConnections.value = history.getRecent()
+        }
+        videoSessionStartTime = 0L
+        videoClientName = null
+        if (!_isMirroring.value && !_isAudioStreaming.value) _statusText.value = idleStatus
     }
 
     fun setFloatingWindowEnabled(enabled: Boolean) {
@@ -415,7 +452,8 @@ object ReceiverServer {
                 val port = NativeBridge.nativeStart(
                     keyFile, identity.deviceIdHex, identity.serviceName,
                     currentDisplay.width, currentDisplay.height, currentDisplay.refreshRate,
-                    renderer.hevcDecoder != null, requirePin
+                    renderer.hevcDecoder != null, requirePin,
+                    videoPlaybackEnabled, videoLanguages()
                 )
                 check(port > 0) { "Server failed to start ($port)" }
                 if (mirrorGeneration.get() == startEvent) {
@@ -427,6 +465,12 @@ object ReceiverServer {
             stop = {
                 callbacksEnabled.set(false)
                 callbackGeneration.incrementAndGet()
+                mainHandler.post {
+                    if (VideoPlayback.player.value != null) {
+                        VideoPlayback.release()
+                        endVideoSession()
+                    }
+                }
                 renderer.endSession()
                 audioRenderer.endSession()
                 NativeBridge.nativeSetListener(null)
@@ -479,6 +523,11 @@ object ReceiverServer {
 
     /** The user left the stream on the device (Back/Home): drop the sender by restarting the receiver. */
     fun disconnectClient(reason: String) {
+        // An AirPlay video ends gracefully: the sender sees it finished on its next progress poll.
+        if (VideoPlayback.player.value != null) {
+            VideoPlayback.close(reason)
+            return
+        }
         if (!_isMirroring.value && !_isAudioStreaming.value) return
         Log.i("SecondDisplay", "Disconnecting client: $reason")
         restartServer()
@@ -686,6 +735,37 @@ object ReceiverServer {
                 mainHandler.removeCallbacks(clearPairingCode)
                 mainHandler.postDelayed(clearPairingCode, 90_000)
                 if (!isActivityResumed) onIncomingStreamBackgroundCallback?.invoke()
+            }
+        }
+
+        override fun onVideoPlay(url: String, startSec: Float) {
+            if (!callbacksEnabled.get()) return
+            mainHandler.post {
+                endPairingPrompt()
+                if (VideoPlayback.player.value == null) {
+                    videoSessionStartTime = System.currentTimeMillis()
+                    videoClientName = sessionClientName ?: _clientName.value
+                }
+                VideoPlayback.play(appContext, url, startSec)
+                _statusText.value = "Playing video from ${videoClientName ?: "AirPlay"}"
+                if (!isActivityResumed) onIncomingStreamBackgroundCallback?.invoke()
+            }
+        }
+
+        override fun onVideoSeek(positionSec: Float) {
+            if (callbacksEnabled.get()) mainHandler.post { VideoPlayback.seek(positionSec) }
+        }
+
+        override fun onVideoRate(rate: Float) {
+            if (callbacksEnabled.get()) mainHandler.post { VideoPlayback.setRate(rate) }
+        }
+
+        override fun onVideoStop() {
+            mainHandler.post {
+                if (VideoPlayback.player.value != null) {
+                    VideoPlayback.release()
+                    endVideoSession()
+                }
             }
         }
 

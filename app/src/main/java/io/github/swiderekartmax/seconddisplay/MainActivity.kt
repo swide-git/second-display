@@ -218,6 +218,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val mirroring by ReceiverServer.isMirroring.collectAsState()
+            val videoPlayer by VideoPlayback.player.collectAsState()
             val audioStreaming by ReceiverServer.isAudioStreaming.collectAsState()
             val nowPlaying by ReceiverServer.nowPlaying.collectAsState()
             val nowPlayingArt by ReceiverServer.nowPlayingArt.collectAsState()
@@ -241,14 +242,15 @@ class MainActivity : ComponentActivity() {
             }
             var floatingWindowEnabled by remember { mutableStateOf(ReceiverServer.floatingWindowEnabled) }
             var requirePin by remember { mutableStateOf(ReceiverServer.requirePin) }
+            var videoPlaybackEnabled by remember { mutableStateOf(ReceiverServer.videoPlaybackEnabled) }
             var standbyEnabled by remember { mutableStateOf(ReceiverServer.standbyEnabled) }
             var pictureDelayMs by remember { mutableIntStateOf(ReceiverServer.pictureDelayMs) }
             val pairingCode by ReceiverServer.pairingCode.collectAsState()
             val pairedSenderCount by ReceiverServer.pairedSenderCount.collectAsState()
             // Standby: dim to a clock after a minute without touch, keys or streams.
-            LaunchedEffect(standbyEnabled, mirroring, audioStreaming, pairingCode) {
+            LaunchedEffect(standbyEnabled, mirroring, audioStreaming, videoPlayer, pairingCode) {
                 inStandby = false
-                if (!standbyEnabled || mirroring || audioStreaming || pairingCode != null) return@LaunchedEffect
+                if (!standbyEnabled || mirroring || audioStreaming || videoPlayer != null || pairingCode != null) return@LaunchedEffect
                 while (true) {
                     delay(1_000)
                     if (!inStandby && SystemClock.elapsedRealtime() - lastInteraction >= STANDBY_AFTER_MS) inStandby = true
@@ -269,7 +271,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
             // Keep the floating-window shape in step with the picture; auto-enter only while mirroring.
-            LaunchedEffect(mirroring, videoAspectRatio, mirrorBounds, floatingWindowEnabled) {
+            LaunchedEffect(mirroring, videoPlayer, videoAspectRatio, mirrorBounds, floatingWindowEnabled) {
                 if (pipSupported) setPictureInPictureParams(pictureInPictureParams())
             }
 
@@ -285,11 +287,15 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize().onPreviewKeyEvent { handleKey(it.nativeKeyEvent) }) {
                     if (inStandby) {
                         StandbyScreen(serviceName = serviceName)
-                    } else if (inPictureInPicture && !mirroring) {
+                    } else if (inPictureInPicture && !mirroring && videoPlayer == null) {
                         // The sender left while the floating window was up.
                         Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
                             Text("Stream ended", color = Palette.OverlayText, style = MaterialTheme.typography.bodyMedium)
                         }
+                    } else if (videoPlayer != null) {
+                        // AirPlay video: the sender is the remote; Back closes the video here.
+                        BackHandler { ReceiverServer.disconnectClient("back") }
+                        VideoScreen(player = videoPlayer!!)
                     } else if (mirroring) {
                         BackHandler { ReceiverServer.disconnectClient("back") }
                         // Pinch zoom is local only; a new picture geometry starts unzoomed.
@@ -461,6 +467,11 @@ class MainActivity : ComponentActivity() {
                                 requirePin = enabled
                                 ReceiverServer.setRequirePin(enabled)
                             },
+                            videoPlaybackEnabled = videoPlaybackEnabled,
+                            onVideoPlaybackEnabledChanged = { enabled ->
+                                videoPlaybackEnabled = enabled
+                                ReceiverServer.setVideoPlaybackEnabled(enabled)
+                            },
                             pairedSenderCount = pairedSenderCount,
                             onForgetPairedSenders = { ReceiverServer.forgetPairedSenders() },
                             floatingWindowEnabled = floatingWindowEnabled,
@@ -516,6 +527,24 @@ class MainActivity : ComponentActivity() {
     /** Every key reaches Compose first: wake from standby; on a remote, OK or Menu opens the in-session settings. */
     private fun handleKey(event: android.view.KeyEvent): Boolean {
         if (event.action == android.view.KeyEvent.ACTION_DOWN && wakeFromStandby()) return true
+        // AirPlay video on a TV remote: OK / play-pause toggles, left and right skip 10 seconds.
+        // The sender follows through its progress polls.
+        VideoPlayback.player.value?.let { player ->
+            if (event.action != android.view.KeyEvent.ACTION_DOWN) return event.keyCode in VIDEO_KEYS
+            when (event.keyCode) {
+                android.view.KeyEvent.KEYCODE_DPAD_CENTER, android.view.KeyEvent.KEYCODE_ENTER,
+                android.view.KeyEvent.KEYCODE_NUMPAD_ENTER, android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE ->
+                    player.playWhenReady = !player.playWhenReady
+                android.view.KeyEvent.KEYCODE_MEDIA_PLAY -> player.playWhenReady = true
+                android.view.KeyEvent.KEYCODE_MEDIA_PAUSE -> player.playWhenReady = false
+                android.view.KeyEvent.KEYCODE_DPAD_RIGHT, android.view.KeyEvent.KEYCODE_MEDIA_FAST_FORWARD ->
+                    player.seekTo(player.currentPosition + SEEK_STEP_MS)
+                android.view.KeyEvent.KEYCODE_DPAD_LEFT, android.view.KeyEvent.KEYCODE_MEDIA_REWIND ->
+                    player.seekTo((player.currentPosition - SEEK_STEP_MS).coerceAtLeast(0))
+                else -> return false
+            }
+            return true
+        }
         if (ReceiverServer.isMirroring.value && !showMirrorSettings && event.action == android.view.KeyEvent.ACTION_UP &&
             event.keyCode in MIRROR_SETTINGS_KEYS
         ) {
@@ -652,15 +681,22 @@ class MainActivity : ComponentActivity() {
 
     private fun pictureInPictureParams(): PictureInPictureParams {
         // Android accepts aspect ratios between 1:2.39 and 2.39:1.
-        val ratio = (ReceiverServer.videoAspectRatio.value ?: 16f / 9f).coerceIn(1f / 2.39f, 2.39f)
+        val video = VideoPlayback.player.value
+        val videoRatio = video?.videoSize?.takeIf { it.width > 0 && it.height > 0 }
+            ?.let { it.width * it.pixelWidthHeightRatio / it.height }
+        val ratio = (if (video != null) videoRatio else ReceiverServer.videoAspectRatio.value ?: 16f / 9f)
+            ?.coerceIn(1f / 2.39f, 2.39f) ?: (16f / 9f)
         val builder = PictureInPictureParams.Builder().setAspectRatio(Rational((ratio * 1000).toInt(), 1000))
-        mirrorBounds?.takeIf { !it.isEmpty }?.let { builder.setSourceRectHint(it) }
+        if (video == null) mirrorBounds?.takeIf { !it.isEmpty }?.let { builder.setSourceRectHint(it) }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            builder.setAutoEnterEnabled(ReceiverServer.isMirroring.value && ReceiverServer.floatingWindowEnabled)
+            builder.setAutoEnterEnabled(streamOnScreen() && ReceiverServer.floatingWindowEnabled)
                 .setSeamlessResizeEnabled(false)
         }
         return builder.build()
     }
+
+    /** A mirror or an AirPlay video fills the screen: Home turns it into the floating window. */
+    private fun streamOnScreen(): Boolean = ReceiverServer.isMirroring.value || VideoPlayback.player.value != null
 
     /** False when the user switched picture-in-picture off for this app in system settings. */
     private fun pictureInPictureAllowed(): Boolean {
@@ -681,7 +717,7 @@ class MainActivity : ComponentActivity() {
     // While mirroring it opens the floating window instead (Android 12+ enters it on its own).
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (ReceiverServer.isMirroring.value && pictureInPictureAllowed()) {
+        if (streamOnScreen() && pictureInPictureAllowed()) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) return
             if (runCatching { enterPictureInPictureMode(pictureInPictureParams()) }.getOrDefault(false)) return
         }
@@ -713,6 +749,14 @@ class MainActivity : ComponentActivity() {
 
         const val STANDBY_AFTER_MS = 60_000L
         const val LOW_BATTERY_PERCENT = 15
+        const val SEEK_STEP_MS = 10_000L
+        val VIDEO_KEYS = setOf(
+            android.view.KeyEvent.KEYCODE_DPAD_CENTER, android.view.KeyEvent.KEYCODE_ENTER,
+            android.view.KeyEvent.KEYCODE_NUMPAD_ENTER, android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+            android.view.KeyEvent.KEYCODE_MEDIA_PLAY, android.view.KeyEvent.KEYCODE_MEDIA_PAUSE,
+            android.view.KeyEvent.KEYCODE_DPAD_RIGHT, android.view.KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
+            android.view.KeyEvent.KEYCODE_DPAD_LEFT, android.view.KeyEvent.KEYCODE_MEDIA_REWIND
+        )
         val MIRROR_SETTINGS_KEYS = setOf(
             android.view.KeyEvent.KEYCODE_DPAD_CENTER, android.view.KeyEvent.KEYCODE_ENTER,
             android.view.KeyEvent.KEYCODE_NUMPAD_ENTER, android.view.KeyEvent.KEYCODE_MENU
@@ -721,6 +765,26 @@ class MainActivity : ComponentActivity() {
 }
 
 /** Dim clock with the receiver name. It drifts a little every minute so a panel does not burn in. */
+/** AirPlay video, full screen; controls stay on the sender (and the TV remote, see handleKey). */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+@Composable
+private fun VideoScreen(player: androidx.media3.exoplayer.ExoPlayer) {
+    AndroidView(
+        factory = { context ->
+            androidx.media3.ui.PlayerView(context).apply {
+                useController = false
+                setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_ALWAYS)
+                setShutterBackgroundColor(android.graphics.Color.BLACK)
+                setBackgroundColor(android.graphics.Color.BLACK)
+                keepScreenOn = true
+            }
+        },
+        update = { it.player = player },
+        onRelease = { it.player = null },
+        modifier = Modifier.fillMaxSize().background(Color.Black)
+    )
+}
+
 @Composable
 private fun StandbyScreen(serviceName: String) {
     var now by remember { mutableStateOf(java.util.Date()) }
@@ -1050,6 +1114,8 @@ private fun DashboardScreen(
     pipSupported: Boolean,
     requirePin: Boolean,
     onRequirePinChanged: (Boolean) -> Unit,
+    videoPlaybackEnabled: Boolean,
+    onVideoPlaybackEnabledChanged: (Boolean) -> Unit,
     pairedSenderCount: Int,
     onForgetPairedSenders: () -> Unit,
     floatingWindowEnabled: Boolean,
@@ -1229,6 +1295,14 @@ private fun DashboardScreen(
                 onToggle = { onStartOnBootChanged(!startOnBoot) }
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+            SwitchRow(
+                title = "AirPlay video",
+                supporting = if (videoPlaybackEnabled) "YouTube sends the video itself, played here in full quality"
+                             else "Videos are mirrored like the rest of the screen",
+                icon = Icons.Filled.PlayArrow,
+                checked = videoPlaybackEnabled,
+                onToggle = { onVideoPlaybackEnabledChanged(!videoPlaybackEnabled) }
+            )
             SwitchRow(
                 title = "H.265 video",
                 supporting = "Experimental; lower bitrate if the sender agrees. Reconnect after changing",
