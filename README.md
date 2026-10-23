@@ -56,7 +56,7 @@ Second Display is an independent community project and is not affiliated with Ap
 ## Requirements
 
 - **Android**: 11 or newer (API 30+); built for Android 16 (targetSdk 36), 16 KB memory pages supported.
-- **CPU**: 64-bit ARM (`arm64-v8a`), i.e. practically every phone and tablet from recent years.
+- **CPU**: ARM, 64-bit (`arm64-v8a`) or 32-bit (`armeabi-v7a`). The 32-bit build is for Google TV sets and other devices that run a 32-bit Android on a 64-bit chip, typically with 2 GB of RAM.
 - **Network**: device and sender on the **same Wi-Fi network** (5 GHz strongly recommended), or the sender joined to the device's own **hotspot**.
 - **Sender**: Mac, iPhone or iPad (Screen Mirroring / AirPlay).
 

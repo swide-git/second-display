@@ -41,7 +41,9 @@ android {
         targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName
-        ndk { abiFilters += "arm64-v8a" }
+        // armeabi-v7a: Google TV sets and older devices run a 32-bit Android on 64-bit CPUs
+        // (e.g. CHiQ and TCL TVs with 2 GB RAM). Play delivers one ABI per device from the bundle.
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
         externalNativeBuild {
             cmake {
                 targets("seconddisplay")

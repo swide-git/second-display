@@ -7,8 +7,8 @@ hours.
 ## What this is
 
 An AirPlay-compatible **mirroring and extended display receiver** for Android,
-for Android 11+ phones and tablets (minSdk 30, targetSdk 36, arm64, Wi-Fi
-only), tested on a Xiaomi Pad (Android 14, HyperOS). Second Display is a fork of
+for Android 11+ phones, tablets and Google TV (minSdk 30, targetSdk 36, arm64 and
+armv7), tested on a Xiaomi Redmi Pad (Android 14, HyperOS) and a Galaxy S26 Ultra. Second Display is a fork of
 Wormhole Display (pgodlews/wormhole-display), which targeted Meta Portals (Android 9-10); Portals
 are not supported by this build. A Mac, iPhone or
 iPad sees the device in its native Screen Mirroring picker and streams video and
@@ -266,8 +266,15 @@ adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
   `START_STICKY` only with background on, and a sticky restart with background off
   stops itself. The close button in the top bar always stops both and calls
   `finishAndRemoveTask()`.
+- **ABIs**: `arm64-v8a` and `armeabi-v7a`. Many Google TV sets (CHiQ U43QM9G, TCL with
+  2 GB RAM) run a 32-bit Android on a 64-bit SoC, and Play marks an arm64-only app as
+  incompatible there. `scripts/build-deps.sh <abi>` builds OpenSSL and libplist per ABI;
+  `openssl/configuration.h` differs between them (`THIRTY_TWO_BIT` vs
+  `SIXTY_FOUR_BIT_LONG`), so it lives in `deps/openssl/include-abi/<abi>/` ahead of the
+  shared headers. Using the arm64 header on armv7 would silently break the bignum code
+  in pairing. The 16 KB rule and its CI check apply to `arm64-v8a` only.
 - **16 KB pages**: `-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON` (cmake arguments in
-  `app/build.gradle.kts`) aligns `libseconddisplay.so` LOAD segments to 16 KB; NDK r27
+  `app/build.gradle.kts`) aligns the 64-bit `libseconddisplay.so` LOAD segments to 16 KB; NDK r27
   defaults to 4 KB. Without it Google Play withholds the app from devices with 16 KB
   memory pages, which report "can't download" (a Galaxy S26 Ultra did). CI checks
   `llvm-readelf -lW` and `zipalign -c -P 16` on every build.
@@ -381,8 +388,9 @@ adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
 ## Rebuilding the native deps (only to upgrade OpenSSL/libplist)
 
 ```bash
-# needs NDK r27d at .tools/ndk-r27d
-./scripts/build-deps.sh
+# NDK r27d: $ANDROID_NDK_ROOT, .tools/ndk-r27d or $ANDROID_HOME/ndk/27.3.13750724
+./scripts/build-deps.sh arm64-v8a
+./scripts/build-deps.sh armeabi-v7a
 ```
 
 Gotchas already encoded in the script: OpenSSL 3.0 wants `ANDROID_NDK_ROOT` (not
