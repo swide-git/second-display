@@ -7,10 +7,10 @@ hours.
 ## What this is
 
 An AirPlay-compatible **mirroring and extended display receiver** for Android,
-for Android 11+ phones, tablets and Google TV (minSdk 30, targetSdk 36, arm64 and
+for Android 9+ phones, tablets, Android TV and Google TV (minSdk 28, targetSdk 36, arm64 and
 armv7), tested on a Xiaomi Redmi Pad (Android 14, HyperOS) and a Galaxy S26 Ultra. Second Display is a fork of
 Wormhole Display (pgodlews/wormhole-display), which targeted Meta Portals (Android 9-10); Portals
-are not supported by this build. A Mac, iPhone or
+are not supported by this build, but older Android TV sets on Android 9-10 are. A Mac, iPhone or
 iPad sees the device in its native Screen Mirroring picker and streams video and
 audio to it. The AirPlay heavy lifting (RTSP, FairPlay, decryption, mDNS) is a
 vendored copy of UxPlay's C core at `app/src/main/cpp/uxplay/`; the app layer is
@@ -160,7 +160,7 @@ adb logcat | grep -E "uxplay|SecondDisplay|AndroidRuntime|libc"
 | Re-pairing a running app via `am start … --es` silently does nothing | Standard-launchMode activities don't get `onNewIntent` when already on top | `android:launchMode="singleTop"` (already set) |
 | Stream is live (decoders started) but the app stays behind the launcher | Android 10 blocks background activity starts; logcat shows `Background activity start … isBgStartWhitelisted: false` | Needs "Display over other apps" (`SYSTEM_ALERT_WINDOW` appop). The dashboard's *Open when a stream starts* row links to it. A new `applicationId` starts without the grant |
 | mDNS advertising works on desktop Java but not on device | Android drops multicast without a `WifiManager.MulticastLock`; also needs `CHANGE_WIFI_MULTICAST_STATE` | `ReceiverIdentity` holds the multicast lock - it must be held while mdnsd runs |
-| Why not `NsdManager` for Bonjour? | It cannot publish TXT records before API 31; this build supports API 30 | Native `mdnsd` is used instead (and is required for /info anyway) |
+| Why not `NsdManager` for Bonjour? | It cannot publish TXT records before API 31; this build supports API 28 | Native `mdnsd` is used instead (and is required for /info anyway) |
 | Native link errors: `dnssd_private_init`, `dnssd_get_*_txt` undefined | Those symbols live in a dnssd *backend*; you must compile exactly one (`mdnsd/`) | `${UX}/mdnsd/*.c` is in the CMake glob |
 | Stale native builds after adding/removing .c files | CMake `file(GLOB)` result is cached | The glob uses `CONFIGURE_DEPENDS`; if it still looks stale, `rm -rf app/build/intermediates/cxx app/.cxx` then rebuild |
 | Multiple receivers on one LAN collide / connections misrouted | `gethostname()` returns "localhost" on Android | mDNS hostname is derived from `hwaddr` (vendor patch in `mdnsd/dnssd_mdnsd.c`) |

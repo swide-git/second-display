@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
+import android.os.Build
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.Collections
@@ -70,10 +71,17 @@ object NetworkInfoHelper {
     private fun getWifiInfo(context: Context): Pair<String, Boolean> {
         return try {
             // WifiManager.connectionInfo is deprecated; the active network's transport info
-            // carries the same WifiInfo (the SSID is redacted without location permission).
+            // carries the same WifiInfo from Android 10 (the SSID is redacted without location
+            // permission). Android 9 only has the old call.
             val cm = context.getSystemService(ConnectivityManager::class.java)
             val caps = cm?.getNetworkCapabilities(cm.activeNetwork)
-            val ssid = (caps?.transportInfo as? WifiInfo)?.ssid?.removeSurrounding("\"")
+            val info = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                caps?.transportInfo as? WifiInfo
+            } else {
+                @Suppress("DEPRECATION")
+                context.applicationContext.getSystemService(WifiManager::class.java)?.connectionInfo
+            }
+            val ssid = info?.ssid?.removeSurrounding("\"")
             if (ssid != null && ssid != WifiManager.UNKNOWN_SSID && ssid.isNotBlank()) {
                 Pair(ssid, true)
             } else if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true || getLocalIpAddress() != null) {
